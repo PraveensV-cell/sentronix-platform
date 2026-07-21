@@ -1,0 +1,17 @@
+[project]
+name = "sentronix-platform"
+version = "0.1.0"
+description = "Enterprise AI-Powered Intelligent Surveillance Platform"
+requires-python = ">=3.11"
+
+[tool.black]
+line-length = 88
+target-version = ["py311"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+
+[tool.pyright]
+pythonVersion = "3.11"
+typeCheckingMode = "basic"
