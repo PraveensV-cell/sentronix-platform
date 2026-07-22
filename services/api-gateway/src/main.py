@@ -4,7 +4,9 @@ from fastapi import FastAPI
 
 from src.api.v1.router import api_router
 from src.core.config import settings
-from src.core.startup import shutdown, startup
+from src.core.logger import logger
+from src.core.startup import startup, shutdown
+from src.exceptions.handlers import register_exception_handlers
 
 
 @asynccontextmanager
@@ -13,11 +15,19 @@ async def lifespan(app: FastAPI):
     Application lifecycle management.
     """
 
+    logger.info("Starting SENTRONIX API Gateway...")
+
     await startup()
+
+    logger.info("API Gateway Started Successfully")
 
     yield
 
+    logger.info("API Gateway Shutting Down")
+
     await shutdown()
+
+    logger.info("API Gateway Shutdown Complete")
 
 
 app = FastAPI(
@@ -37,4 +47,8 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Register Global Exception Handlers
+register_exception_handlers(app)
+
+# Register API Routes
 app.include_router(api_router)
