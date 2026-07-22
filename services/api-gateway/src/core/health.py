@@ -1,5 +1,6 @@
 from datetime import datetime
 
+from src.core.config import settings
 from src.schemas.health import HealthResponse
 
 APP_START_TIME = datetime.utcnow()
@@ -19,9 +20,9 @@ def get_uptime() -> str:
 
 def health_status() -> HealthResponse:
     return HealthResponse(
-        service="API Gateway",
+        service=settings.APP_NAME,
         status="healthy",
-        version="0.1.0",
+        version=settings.APP_VERSION,
         uptime=get_uptime(),
         timestamp=datetime.utcnow(),
     )
