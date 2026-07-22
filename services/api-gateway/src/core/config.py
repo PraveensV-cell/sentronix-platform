@@ -28,5 +28,9 @@ class Settings(BaseSettings):
 
     LICENSE_NAME: str = "MIT"
 
+    JWT_SECRET_KEY: str
+    JWT_ALGORITHM: str
+    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int
+
 
 settings = Settings()
