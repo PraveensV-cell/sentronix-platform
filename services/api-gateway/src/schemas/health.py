@@ -1,11 +1,7 @@
-from datetime import datetime
-
-from pydantic import BaseModel
+from src.schemas.common import BaseResponse
 
 
-class HealthResponse(BaseModel):
+class HealthResponse(BaseResponse):
     service: str
     status: str
     version: str
-    uptime: str
-    timestamp: datetime
