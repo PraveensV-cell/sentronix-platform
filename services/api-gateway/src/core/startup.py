@@ -1,4 +1,5 @@
 import logging
+from src.core.service_registry import registry, ServiceInfo
 
 logger = logging.getLogger("sentronix")
 
@@ -14,6 +15,15 @@ async def startup():
     logger.info("Initializing services...")
     logger.info("API Gateway Ready")
     logger.info("=" * 60)
+
+    registry.register(
+        ServiceInfo(
+            name="api_gateway",
+            version="0.1.0",
+            status="healthy",
+            description="Main API Gateway",
+        )
+    )
 
 
 async def shutdown():
