@@ -2,6 +2,9 @@ from fastapi import APIRouter, HTTPException, status
 
 from src.schemas.auth import LoginRequest, TokenResponse
 from src.services.auth import AuthenticationService
+from fastapi import Depends
+from src.dependencies.roles import RoleChecker
+from src.dependencies.auth import get_current_user
 
 router = APIRouter(
     prefix="/auth",
@@ -9,6 +12,7 @@ router = APIRouter(
 )
 
 auth_service = AuthenticationService()
+admin_only = RoleChecker(["super_admin"])
 
 
 @router.post(
@@ -29,3 +33,29 @@ async def login(request: LoginRequest):
         )
 
     return result
+
+
+@router.get(
+    "/me",
+)
+async def get_me(
+    current_user=Depends(get_current_user),
+):
+
+    return {"user": current_user}
+
+
+@router.get(
+    "/admin",
+)
+async def admin_panel(
+    current_user=Depends(admin_only),
+):
+    """
+    Accessible only to super administrators.
+    """
+
+    return {
+        "message": "Welcome to the SENTRONIX Admin Panel",
+        "user": current_user,
+    }
