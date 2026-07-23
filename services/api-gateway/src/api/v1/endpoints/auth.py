@@ -1,10 +1,9 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 
+from src.dependencies.auth import get_current_user
+from src.dependencies.roles import RoleChecker
 from src.schemas.auth import LoginRequest, TokenResponse
 from src.services.auth import AuthenticationService
-from fastapi import Depends
-from src.dependencies.roles import RoleChecker
-from src.dependencies.auth import get_current_user
 
 router = APIRouter(
     prefix="/auth",
@@ -12,14 +11,20 @@ router = APIRouter(
 )
 
 auth_service = AuthenticationService()
+
+# Role Dependency
 admin_only = RoleChecker(["super_admin"])
 
 
 @router.post(
     "/login",
     response_model=TokenResponse,
+    summary="User Login",
 )
 async def login(request: LoginRequest):
+    """
+    Authenticate a user and return a JWT access token.
+    """
 
     result = auth_service.authenticate(
         request.username,
@@ -37,25 +42,34 @@ async def login(request: LoginRequest):
 
 @router.get(
     "/me",
+    summary="Current Logged-in User",
 )
 async def get_me(
     current_user=Depends(get_current_user),
 ):
+    """
+    Return information about the currently authenticated user.
+    """
 
-    return {"user": current_user}
+    return {
+        "success": True,
+        "user": current_user,
+    }
 
 
 @router.get(
     "/admin",
+    summary="Admin Panel",
 )
 async def admin_panel(
     current_user=Depends(admin_only),
 ):
     """
-    Accessible only to super administrators.
+    Accessible only to users with the 'super_admin' role.
     """
 
     return {
+        "success": True,
         "message": "Welcome to the SENTRONIX Admin Panel",
         "user": current_user,
     }

@@ -1,29 +1,27 @@
 import time
 
 from fastapi import Request
+from starlette.middleware.base import BaseHTTPMiddleware
 
-from src.core.logger import logger
+from src.core.logger import app_logger
 
 
-class RequestLoggingMiddleware:
+class LoggingMiddleware(BaseHTTPMiddleware):
     """
-    Enterprise request logging middleware.
+    Logs every incoming request and outgoing response.
     """
 
-    async def __call__(self, request: Request, call_next):
+    async def dispatch(self, request: Request, call_next):
         start_time = time.time()
+
+        app_logger.info(f"Incoming Request | {request.method} {request.url.path}")
 
         response = await call_next(request)
 
         process_time = round((time.time() - start_time) * 1000, 2)
 
-        logger.info(
-            "%s | %s | %s | %s | %.2f ms",
-            request.client.host,
-            request.method,
-            request.url.path,
-            response.status_code,
-            process_time,
+        app_logger.info(
+            f"Completed | Status={response.status_code} | Time={process_time} ms"
         )
 
         return response
