@@ -1,19 +1,27 @@
-import logging
-import sys
 from pathlib import Path
+
+from loguru import logger
 
 LOG_DIR = Path("logs")
 LOG_DIR.mkdir(exist_ok=True)
 
-LOG_FILE = LOG_DIR / "api_gateway.log"
+logger.remove()
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
-    handlers=[
-        logging.FileHandler(LOG_FILE),
-        logging.StreamHandler(sys.stdout),
-    ],
+logger.add(
+    LOG_DIR / "sentronix.log",
+    rotation="10 MB",
+    retention="30 days",
+    compression="zip",
+    enqueue=True,
+    backtrace=True,
+    diagnose=True,
+    level="INFO",
 )
 
-logger = logging.getLogger("sentronix-api")
+logger.add(
+    sink=lambda msg: print(msg, end=""),
+    colorize=True,
+    level="INFO",
+)
+
+app_logger = logger
