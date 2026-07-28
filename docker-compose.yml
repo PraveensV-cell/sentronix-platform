@@ -1,0 +1,222 @@
+services:
+
+  postgres:
+    image: postgres:16
+
+    container_name: sentronix-postgres
+
+    restart: unless-stopped
+
+    env_file:
+      - ./infrastructure/postgres/postgres.env
+
+    ports:
+      - "5432:5432"
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infrastructure/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7
+
+    container_name: sentronix-redis
+
+    restart: unless-stopped
+
+    command: redis-server /usr/local/etc/redis/redis.conf
+
+    ports:
+      - "6379:6379"
+
+    volumes:
+      - ./infrastructure/redis/redis.conf:/usr/local/etc/redis/redis.conf
+
+  rabbitmq:
+    image: rabbitmq:3-management
+
+    container_name: sentronix-rabbitmq
+
+    restart: unless-stopped
+
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+
+  pgadmin:
+    image: dpage/pgadmin4
+
+    container_name: sentronix-pgadmin
+
+    restart: unless-stopped
+
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@sentronix.com
+      PGADMIN_DEFAULT_PASSWORD: admin123
+
+    ports:
+      - "5050:80"
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+
+  api-gateway:
+    build:
+      context: .
+      dockerfile: services/api-gateway/Dockerfile
+
+    ports:
+      - "8000:8000"
+
+    env_file:
+      - ./services/api-gateway/.env
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      rabbitmq:
+        condition: service_started
+
+    restart: unless-stopped
+
+  ai-service:
+    build:
+      context: .
+      dockerfile: services/ai-service/Dockerfile
+
+    ports:
+      - "8001:8001"
+
+    env_file:
+      - ./services/ai-service/.env
+
+    depends_on:
+      api-gateway:
+        condition: service_started
+
+    restart: unless-stopped
+
+  camera-service:
+    build:
+      context: .
+      dockerfile: services/camera-service/Dockerfile
+
+    ports:
+      - "8002:8002"
+
+    env_file:
+      - ./services/camera-service/.env
+
+    depends_on:
+      api-gateway:
+        condition: service_started
+
+    restart: unless-stopped
+
+  device-service:
+    build:
+      context: .
+      dockerfile: services/device-service/Dockerfile
+
+    ports:
+      - "8003:8003"
+
+    env_file:
+      - ./services/device-service/.env
+
+    depends_on:
+      api-gateway:
+        condition: service_started
+
+    restart: unless-stopped
+
+  event-service:
+    build:
+      context: .
+      dockerfile: services/event-service/Dockerfile
+
+    ports:
+      - "8004:8004"
+
+    env_file:
+      - ./services/event-service/.env
+
+    depends_on:
+      api-gateway:
+        condition: service_started
+
+    restart: unless-stopped
+
+  notification-service:
+    build:
+      context: .
+      dockerfile: services/notification-service/Dockerfile
+
+    ports:
+      - "8005:8005"
+
+    env_file:
+      - ./services/notification-service/.env
+
+    depends_on:
+      api-gateway:
+        condition: service_started
+
+    restart: unless-stopped
+
+  storage-service:
+    build:
+      context: .
+      dockerfile: services/storage-service/Dockerfile
+
+    ports:
+      - "8006:8006"
+
+    env_file:
+      - ./services/storage-service/.env
+
+    depends_on:
+      api-gateway:
+        condition: service_started
+
+    restart: unless-stopped
+
+  analytics-service:
+    build:
+      context: .
+      dockerfile: services/analytics-service/Dockerfile
+
+    ports:
+      - "8007:8007"
+
+    env_file:
+      - ./services/analytics-service/.env
+
+    depends_on:
+      api-gateway:
+        condition: service_started
+
+    restart: unless-stopped
+
+volumes:
+
+  postgres_data:
+
+  rabbitmq_data:
+
+  pgadmin_data:

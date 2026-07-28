@@ -1,0 +1,13 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "Sentronix PostgreSQL",
+      "Group": "Servers",
+      "Host": "postgres",
+      "Port": 5432,
+      "MaintenanceDB": "sentronix",
+      "Username": "postgres",
+      "SSLMode": "prefer"
+    }
+  }
+}

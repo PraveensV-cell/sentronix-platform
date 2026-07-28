@@ -1,0 +1,30 @@
+class MetricsService:
+    def metrics(self):
+
+        return {
+            # Core
+            "events": 245,
+            "detections": 892,
+            "cameras": 18,
+            "devices": 12,
+            "storage_gb": 148.7,
+            # Alerts
+            "active_alerts": 6,
+            # Health
+            "uptime_percent": 99.94,
+            # AI
+            "average_confidence": 0.91,
+            "average_inference_ms": 41,
+            "model": "YOLOv8",
+            # Notification
+            "notifications_sent": 154,
+            "email_notifications": 126,
+            "webhook_notifications": 28,
+            # Storage
+            "stored_images": 892,
+            "stored_videos": 17,
+            "stored_snapshots": 154,
+            # System
+            "healthy_services": 8,
+            "running_services": 8,
+        }

@@ -1,48 +1,44 @@
-from src.core.jwt import create_access_token
-from src.core.security import verify_password
+from sqlalchemy.orm import Session
+
+from src.auth.jwt import create_access_token
+from src.auth.password import verify_password
+from src.schemas.auth import TokenResponse
+from src.services.user import UserService
 
 
 class AuthenticationService:
     """
-    Enterprise Authentication Service
+    Handles user authentication.
     """
+
+    def __init__(self, db: Session):
+        self.user_service = UserService(db)
 
     def authenticate(
         self,
         username: str,
         password: str,
-    ):
-        """
-        Authenticate a user.
+    ) -> TokenResponse | None:
 
-        NOTE:
-        Temporary hardcoded credentials.
-        Database integration comes later.
-        """
+        user = self.user_service.authenticate_user(username)
 
-        demo_username = "admin"
-        demo_password = "Sentronix@123"
-
-        if username != demo_username:
+        if user is None:
             return None
 
-        # Temporary hash generation.
-        # This will be replaced by database lookup later.
-        from src.core.security import hash_password
-
-        hashed_password = hash_password(demo_password)
-
-        if not verify_password(password, hashed_password):
+        if not verify_password(
+            password,
+            user.hashed_password,
+        ):
             return None
 
-        token = create_access_token(
+        access_token = create_access_token(
             {
-                "sub": username,
-                "role": "super_admin",
+                "sub": user.username,
+                "role": user.role,
             }
         )
 
-        return {
-            "access_token": token,
-            "token_type": "bearer",
-        }
+        return TokenResponse(
+            access_token=access_token,
+            token_type="bearer",
+        )

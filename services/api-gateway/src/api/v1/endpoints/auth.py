@@ -1,5 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
 
+from src.database.session import get_db
 from src.dependencies.auth import get_current_user
 from src.dependencies.roles import RoleChecker
 from src.schemas.auth import LoginRequest, TokenResponse
@@ -10,8 +12,6 @@ router = APIRouter(
     tags=["Authentication"],
 )
 
-auth_service = AuthenticationService()
-
 # Role Dependency
 admin_only = RoleChecker(["super_admin"])
 
@@ -21,10 +21,16 @@ admin_only = RoleChecker(["super_admin"])
     response_model=TokenResponse,
     summary="User Login",
 )
-async def login(request: LoginRequest):
+async def login(
+    request: LoginRequest,
+    db: Session = Depends(get_db),
+):
     """
-    Authenticate a user and return a JWT access token.
+    Authenticate a user using the PostgreSQL database
+    and return a JWT access token.
     """
+
+    auth_service = AuthenticationService(db)
 
     result = auth_service.authenticate(
         request.username,

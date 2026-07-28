@@ -1,38 +1,38 @@
-import logging
-from src.core.service_registry import registry, ServiceInfo
+from sqlalchemy import text
 
-logger = logging.getLogger("sentronix")
+from src.core.logger import logger
+from src.database.base import Base
+from src.database.session import SessionLocal, engine
+
+# Import every model so SQLAlchemy registers them
+from src.models import *  # noqa: F401,F403
 
 
-async def startup():
+async def startup() -> None:
     """
-    Executed when the application starts.
-    """
-
-    logger.info("=" * 60)
-    logger.info("Starting SENTRONIX API Gateway")
-    logger.info("Loading configuration...")
-    logger.info("Initializing services...")
-    logger.info("API Gateway Ready")
-    logger.info("=" * 60)
-
-    registry.register(
-        ServiceInfo(
-            name="api_gateway",
-            version="0.1.0",
-            status="healthy",
-            description="Main API Gateway",
-        )
-    )
-
-
-async def shutdown():
-    """
-    Executed when the application stops.
+    Application startup.
     """
 
-    logger.info("=" * 60)
-    logger.info("Stopping SENTRONIX API Gateway")
-    logger.info("Cleaning resources...")
-    logger.info("Shutdown Complete")
-    logger.info("=" * 60)
+    logger.info("Initializing database...")
+
+    # Create all missing tables
+    Base.metadata.create_all(bind=engine)
+
+    logger.info("Database tables verified.")
+
+    db = SessionLocal()
+
+    try:
+        db.execute(text("SELECT 1"))
+        db.commit()
+        logger.info("Database connection successful.")
+    finally:
+        db.close()
+
+
+async def shutdown() -> None:
+    """
+    Application shutdown.
+    """
+
+    logger.info("Application shutdown complete.")
