@@ -23,6 +23,8 @@ class Settings(BaseSettings):
         env_file=".env",
         extra="ignore",
     )
+    AI_SERVICE_URL: str = "http://ai-service:8001"
+    AI_DETECTION_TIMEOUT: int = 10
 
 
 settings = Settings()

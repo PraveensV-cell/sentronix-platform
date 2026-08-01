@@ -5,6 +5,9 @@ from pathlib import Path
 
 import cv2
 
+from src.services.camera_connection_manager import (
+    camera_connection_manager,
+)
 from src.services.camera_service import camera_service
 
 
@@ -15,6 +18,9 @@ class RecordingService:
 
     def __init__(self):
         self.recordings = {}
+        self.recording_history = []
+        self.recording_metadata = {}
+
         self.output_dir = Path("recordings")
         self.output_dir.mkdir(
             exist_ok=True,
@@ -34,7 +40,7 @@ class RecordingService:
                 "message": "Camera is already recording.",
             }
 
-        camera = camera_service.cameras.get(
+        camera = camera_service.get_camera(
             camera_name,
         )
 
@@ -44,11 +50,12 @@ class RecordingService:
                 "message": "Camera not found.",
             }
 
-        capture = cv2.VideoCapture(
-            camera.camera_url,
-        )
+        try:
+            capture = camera_connection_manager.connect(
+                camera_name,
+            )
 
-        if not capture.isOpened():
+        except Exception:
             return {
                 "success": False,
                 "message": "Unable to open camera.",
@@ -87,9 +94,17 @@ class RecordingService:
         )
 
         self.recordings[camera_name] = {
-            "capture": capture,
             "writer": writer,
             "file": str(filepath),
+            "started_at": datetime.now(),
+            "frames": 0,
+        }
+
+        self.recording_metadata[camera_name] = {
+            "camera": camera_name,
+            "file": str(filepath),
+            "started_at": datetime.now().isoformat(),
+            "status": "Recording",
         }
 
         return {
@@ -118,6 +133,8 @@ class RecordingService:
             frame,
         )
 
+        recording["frames"] += 1
+
     def stop_recording(
         self,
         camera_name: str,
@@ -136,10 +153,33 @@ class RecordingService:
                 "message": "Recording not found.",
             }
 
-        recording["capture"].release()
+        camera_connection_manager.disconnect(
+            camera_name,
+        )
+
         recording["writer"].release()
 
         filepath = recording["file"]
+
+        metadata = self.recording_metadata.get(
+            camera_name,
+        )
+
+        if metadata:
+            metadata["status"] = "Completed"
+
+            metadata["ended_at"] = datetime.now().isoformat()
+
+            metadata["frames"] = recording["frames"]
+
+            self.recording_history.append(
+                metadata,
+            )
+
+            self.recording_metadata.pop(
+                camera_name,
+                None,
+            )
 
         del self.recordings[camera_name]
 
@@ -168,6 +208,38 @@ class RecordingService:
 
         return len(
             self.recordings,
+        )
+
+    def active_metadata(
+        self,
+    ):
+        """
+        Get active recording metadata.
+        """
+
+        return list(
+            self.recording_metadata.values(),
+        )
+
+    def history(
+        self,
+    ):
+        """
+        Get recording history.
+        """
+
+        return self.recording_history
+
+    def recording_info(
+        self,
+        camera_name: str,
+    ):
+        """
+        Get one recording information.
+        """
+
+        return self.recording_metadata.get(
+            camera_name,
         )
 
 
