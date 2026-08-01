@@ -1,34 +1,44 @@
-from src.detector.model_loader import model_loader
+from __future__ import annotations
+
+from typing import Any
+
+from src.detector.detector import (
+    detector as detection_engine,
+)
 
 
 class DetectorService:
     """
-    Detection service using the shared YOLO model.
+    Detection service wrapper.
     """
 
-    def __init__(self):
-        self.model = model_loader.get_model()
+    def detect(
+        self,
+        image,
+        confidence: float | None = None,
+    ) -> list[dict[str, Any]]:
+        """
+        Run object detection.
+        """
 
-    def detect(self, image_path: str):
+        return detection_engine.detect(
+            image,
+            confidence,
+        )
 
-        results = self.model.predict(image_path)
+    def detect_batch(
+        self,
+        images: list,
+        confidence: float | None = None,
+    ) -> list[list[dict]]:
+        """
+        Run batch detection.
+        """
 
-        detections = []
-
-        for result in results:
-            if result.boxes is None:
-                continue
-
-            for box in result.boxes:
-                detections.append(
-                    {
-                        "label": result.names[int(box.cls.item())],
-                        "confidence": float(box.conf.item()),
-                        "bbox": [float(x) for x in box.xyxy[0].tolist()],
-                    }
-                )
-
-        return detections
+        return detection_engine.detect_batch(
+            images,
+            confidence,
+        )
 
 
 detector = DetectorService()

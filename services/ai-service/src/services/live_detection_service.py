@@ -1,61 +1,146 @@
+from __future__ import annotations
+
 import cv2
 
 from src.core.config import settings
-from src.detector.model_loader import model_loader
+from src.core.logger import logger
+from src.detector.inference import (
+    inference_engine,
+)
+from src.detector.tracker import (
+    tracker,
+)
+from src.services.tracking_service import (
+    tracking_service,
+)
 
 
 class LiveDetectionService:
     """
-    Real-time webcam / RTSP detection.
+    Handles real-time camera detection and tracking.
     """
 
     def __init__(self):
-        self.model = model_loader.get_model()
+        self.active_streams = {}
 
-    def start(self, source=0):
+    def process_frame(
+        self,
+        frame,
+    ):
+        """
+        Run detection and tracking on frame.
+        """
+
+        detections = inference_engine.run(
+            frame,
+            settings.CONFIDENCE_THRESHOLD,
+        )
+
+        tracked_objects = tracker.update(
+            detections,
+        )
+
+        tracking_service.update(
+            tracked_objects,
+        )
+
+        return tracked_objects
+
+    def start(
+        self,
+        source=0,
+    ):
         """
         Start live detection.
+
         source:
-            0 -> Webcam
+            0 -> USB Camera
             RTSP URL -> IP Camera
         """
 
-        cap = cv2.VideoCapture(source)
+        capture = cv2.VideoCapture(
+            source,
+        )
 
-        if not cap.isOpened():
+        if not capture.isOpened():
             return {
                 "success": False,
                 "message": "Unable to open camera.",
             }
 
-        while True:
-            success, frame = cap.read()
+        stream_id = str(
+            source,
+        )
 
-            if not success:
-                break
+        self.active_streams[stream_id] = capture
 
-            results = self.model(
-                frame,
-                conf=settings.CONFIDENCE_THRESHOLD,
+        try:
+            while capture.isOpened():
+                success, frame = capture.read()
+
+                if not success:
+                    break
+
+                detections = self.process_frame(
+                    frame,
+                )
+
+                yield {
+                    "frame": frame.copy(),
+                    "detections": detections,
+                }
+
+        except Exception as error:
+            logger.error(
+                f"Live detection error: {error}",
             )
 
-            annotated = results[0].plot()
+        finally:
+            capture.release()
 
-            cv2.imshow(
-                "Sentronix Live Detection",
-                annotated,
+            self.active_streams.pop(
+                stream_id,
+                None,
             )
 
-            key = cv2.waitKey(1)
+    def stop(
+        self,
+        source,
+    ):
+        """
+        Stop live detection.
+        """
 
-            if key == ord("q"):
-                break
+        stream_id = str(
+            source,
+        )
 
-        cap.release()
+        capture = self.active_streams.get(
+            stream_id,
+        )
 
-        cv2.destroyAllWindows()
+        if capture:
+            capture.release()
 
-        return {
-            "success": True,
-            "message": "Live detection stopped.",
-        }
+            self.active_streams.pop(
+                stream_id,
+                None,
+            )
+
+            return True
+
+        return False
+
+    def active_count(
+        self,
+    ) -> int:
+        """
+        Active detection streams.
+        """
+
+        return len(
+            self.active_streams,
+        )
+
+
+live_detection_service = LiveDetectionService()
