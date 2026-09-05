@@ -4,9 +4,6 @@ from asyncio import Queue
 from typing import Any
 
 from src.core.logger import logger
-from src.services.detection_service import (
-    detection_service,
-)
 from src.services.publisher_service import (
     publisher_service,
 )
@@ -19,6 +16,7 @@ class DetectionWorker:
 
     def __init__(self):
         self.queue: Queue[dict[str, Any]] = Queue()
+
         self.running = False
 
     async def add_task(
@@ -49,6 +47,11 @@ class DetectionWorker:
         while self.running:
             try:
                 task = await self.queue.get()
+
+                # Local import avoids circular dependency
+                from src.services.detection_service import (
+                    detection_service,
+                )
 
                 result = detection_service.detect_image(
                     task["image"],

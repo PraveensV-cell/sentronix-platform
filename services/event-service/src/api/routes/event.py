@@ -1,20 +1,20 @@
-from asyncio import create_task
+from __future__ import annotations
 
 from fastapi import APIRouter
 from fastapi import HTTPException
-from pydantic import BaseModel
 
+from src.schemas.event import DetectionEventCreate
 from src.schemas.event import EventCreate
 from src.schemas.event import EventResponse
-from src.services.event_service import event_service
-from src.services.service_clients import service_clients
+from src.services.event_service import (
+    event_service,
+)
 
-router = APIRouter()
 
-
-class DetectionEventRequest(BaseModel):
-    camera_id: int
-    detections: list[dict]
+router = APIRouter(
+    prefix="/events",
+    tags=["Events"],
+)
 
 
 @router.post(
@@ -25,10 +25,12 @@ async def create_event(
     event: EventCreate,
 ):
     """
-    Create a new event.
+    Create generic event.
     """
 
-    return event_service.create_event(event)
+    return event_service.create_event(
+        event,
+    )
 
 
 @router.get(
@@ -51,10 +53,12 @@ async def get_event(
     event_id: str,
 ):
     """
-    Get a single event.
+    Get event by id.
     """
 
-    event = event_service.get_event(event_id)
+    event = event_service.get_event(
+        event_id,
+    )
 
     if event is None:
         raise HTTPException(
@@ -65,15 +69,19 @@ async def get_event(
     return event
 
 
-@router.delete("/{event_id}")
+@router.delete(
+    "/{event_id}",
+)
 async def delete_event(
     event_id: str,
 ):
     """
-    Delete an event.
+    Delete event.
     """
 
-    success = event_service.delete_event(event_id)
+    success = event_service.delete_event(
+        event_id,
+    )
 
     if not success:
         raise HTTPException(
@@ -82,6 +90,7 @@ async def delete_event(
         )
 
     return {
+        "success": True,
         "message": "Event deleted successfully",
     }
 
@@ -91,30 +100,27 @@ async def delete_event(
 # ==========================================================
 
 
-@router.post("/detection")
+@router.post(
+    "/detection",
+)
 async def create_detection_event(
-    request: DetectionEventRequest,
+    request: DetectionEventCreate,
 ):
     """
     Receive AI detection events.
     """
 
-    event = event_service.create_detection_event(
+    event = await event_service.create_detection_event(
         camera_id=request.camera_id,
-        detections=request.detections,
+        detections=[detection.model_dump() for detection in request.detections],
     )
-
-    # Forward asynchronously
-    create_task(service_clients.notify(event))
-
-    create_task(service_clients.store(event))
-
-    create_task(service_clients.analyze(event))
 
     return event
 
 
-@router.get("/detection")
+@router.get(
+    "/detection",
+)
 async def get_detection_events():
     """
     Get all AI detection events.
@@ -123,15 +129,19 @@ async def get_detection_events():
     return event_service.get_detection_events()
 
 
-@router.get("/detection/{event_id}")
+@router.get(
+    "/detection/{event_id}",
+)
 async def get_detection_event(
     event_id: str,
 ):
     """
-    Get a single AI detection event.
+    Get detection event.
     """
 
-    event = event_service.get_detection_event(event_id)
+    event = event_service.get_detection_event(
+        event_id,
+    )
 
     if event is None:
         raise HTTPException(

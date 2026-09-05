@@ -1,0 +1,9 @@
+path: D:/majorproject/sentronix-platform/ml-platform/datasets/processed/dfire-sentronix-v1
+
+train: train/images
+val: val/images
+test: test/images
+
+names:
+  0: fire
+  1: smoke

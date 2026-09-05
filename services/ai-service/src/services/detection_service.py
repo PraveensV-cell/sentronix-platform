@@ -8,9 +8,6 @@ from src.core.logger import logger
 from src.detector.detector import detector
 from src.detector.model_loader import model_loader
 from src.utils.image import ImageUtils
-from src.workers.detection_worker import (
-    detection_worker,
-)
 
 
 class DetectionService:
@@ -54,7 +51,7 @@ class DetectionService:
                 )
 
                 for result in results:
-                    result.save(  # type: ignore
+                    result.save(
                         filename=save_path,
                     )
 
@@ -64,9 +61,7 @@ class DetectionService:
                 "success": True,
                 "detections": detections,
                 "annotated_image": annotated_image,
-                "total_objects": len(
-                    detections,
-                ),
+                "total_objects": len(detections),
             }
 
         except Exception as error:
@@ -89,6 +84,11 @@ class DetectionService:
         """
         Add detection task to background worker.
         """
+
+        # Local import prevents circular import
+        from src.workers.detection_worker import (
+            detection_worker,
+        )
 
         await detection_worker.add_task(
             {

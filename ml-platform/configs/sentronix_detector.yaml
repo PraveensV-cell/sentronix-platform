@@ -1,0 +1,25 @@
+project:
+  name: sentronix-security-detector
+
+dataset:
+  name: sentronix-security-v1
+
+classes:
+  0: person
+  1: vehicle
+  2: fire
+  3: smoke
+  4: weapon
+  5: helmet
+  6: safety_vest
+  7: restricted_object
+
+training:
+  image_size: 640
+  batch_size: 16
+  epochs: 100
+
+optimization:
+  export:
+    - onnx
+    - tensorrt

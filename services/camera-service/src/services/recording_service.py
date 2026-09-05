@@ -86,7 +86,7 @@ class RecordingService:
 
         writer = cv2.VideoWriter(
             str(filepath),
-            cv2.VideoWriter_fourcc(
+            cv2.VideoWriter_fourcc(  # type: ignore
                 *"mp4v",
             ),
             fps,

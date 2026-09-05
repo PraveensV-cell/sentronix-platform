@@ -1,0 +1,37 @@
+model:
+  name: SentronixVisionDetector
+
+  version: 1.0
+
+input:
+  image_size: 640
+
+classes:
+  number: 7
+
+  names:
+    0: person
+
+    1: vehicle
+
+    2: fire
+
+    3: smoke
+
+    4: weapon
+
+    5: helmet
+
+    6: safety_vest
+
+training:
+  epochs: 100
+
+  batch_size: 16
+
+  learning_rate: 0.001
+
+optimization:
+  mixed_precision: true
+
+  scheduler: cosine

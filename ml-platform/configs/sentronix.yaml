@@ -1,0 +1,17 @@
+path: datasets/processed/sentronix-security-v1
+
+train: images/train
+
+val: images/val
+
+test: images/test
+
+names:
+  0: person
+  1: vehicle
+  2: fire
+  3: smoke
+  4: weapon
+  5: helmet
+  6: safety_vest
+  7: restricted_object

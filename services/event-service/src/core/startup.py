@@ -1,11 +1,41 @@
+from __future__ import annotations
+
 from src.core.logger import logger
 
 
-def startup() -> None:
-    logger.info("Initializing Event Service...")
-    logger.success("Event Service Started Successfully.")
+async def startup() -> None:
+    """
+    Event Service startup tasks.
+    """
+
+    logger.info(
+        "Initializing Event Service...",
+    )
+
+    # Future:
+    # - Database connection
+    # - Message broker connection
+    # - External service checks
+
+    logger.success(
+        "Event Service Started Successfully.",
+    )
 
 
-def shutdown() -> None:
-    logger.info("Stopping Event Service...")
-    logger.success("Event Service Shutdown Complete.")
+async def shutdown() -> None:
+    """
+    Event Service shutdown tasks.
+    """
+
+    logger.info(
+        "Stopping Event Service...",
+    )
+
+    # Future:
+    # - Close database connection
+    # - Close HTTP clients
+    # - Flush queues
+
+    logger.success(
+        "Event Service Shutdown Complete.",
+    )

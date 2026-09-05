@@ -1,0 +1,35 @@
+# Deep Learning
+torch
+torchvision
+torchaudio
+
+# Model Training
+ultralytics
+
+# Computer Vision
+opencv-python
+pillow
+
+# Data Processing
+numpy
+pandas
+scikit-learn
+
+# Visualization
+matplotlib
+
+# Configuration
+pyyaml
+
+# Progress
+tqdm
+
+# Experiment Tracking
+mlflow
+
+# Dataset Tools
+requests
+gdown
+kaggle
+
+pillow
