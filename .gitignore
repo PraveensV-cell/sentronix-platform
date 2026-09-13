@@ -171,3 +171,5 @@ ml-platform/runs/
 runs/
 
 structure.txt
+
+*.db
