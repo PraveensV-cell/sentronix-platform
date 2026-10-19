@@ -37,7 +37,8 @@ class RegisterRequest(BaseModel):
 
 
 class VerifyOtpRequest(BaseModel):
-    email: EmailStr
+    email: Optional[str] = None
+    email_or_phone: Optional[str] = None
     otp: str
 
 
@@ -52,12 +53,12 @@ def register(req: RegisterRequest):
     try:
         # Check existing
         existing = conn.execute(
-            "SELECT * FROM users WHERE username = ? OR email = ?",
-            (req.username, req.email),
+            "SELECT * FROM users WHERE username = ? OR email = ? OR (phone IS NOT NULL AND phone != '' AND phone = ?)",
+            (req.username, req.email, req.phone),
         ).fetchone()
         if existing:
             raise HTTPException(
-                status_code=400, detail="Username or email already registered"
+                status_code=400, detail="Username, email or phone is already registered"
             )
 
         # Generate 6-digit development OTP
@@ -99,8 +100,13 @@ def register(req: RegisterRequest):
 def verify_otp(req: VerifyOtpRequest):
     conn = get_connection()
     try:
+        lookup = req.email_or_phone or req.email
+        if not lookup:
+            raise HTTPException(status_code=400, detail="Email or phone is required")
+
         user = conn.execute(
-            "SELECT * FROM users WHERE email = ?", (req.email,)
+            "SELECT * FROM users WHERE email = ? OR phone = ? OR username = ?",
+            (lookup, lookup, lookup),
         ).fetchone()
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
@@ -133,8 +139,8 @@ def login(req: LoginRequest):
     conn = get_connection()
     try:
         user = conn.execute(
-            "SELECT * FROM users WHERE username = ? OR email = ?",
-            (req.username_or_email, req.username_or_email),
+            "SELECT * FROM users WHERE username = ? OR email = ? OR phone = ?",
+            (req.username_or_email, req.username_or_email, req.username_or_email),
         ).fetchone()
 
         if not user:

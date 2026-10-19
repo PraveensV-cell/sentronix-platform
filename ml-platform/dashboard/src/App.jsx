@@ -83,6 +83,9 @@ export default function App() {
 
     const handleAuthenticated = (userData) => {
         setUser(userData);
+        // Step 2 Flow: Always present Environment / Mode selection window upon login
+        setEnvironment(null);
+        localStorage.removeItem("sentronix_env");
     };
 
     const handleEnvironmentSelected = (envData) => {

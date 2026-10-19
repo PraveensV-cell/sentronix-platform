@@ -112,10 +112,10 @@ export default function AuthPage({ onAuthenticated }) {
                 {mode === "login" && (
                     <form onSubmit={handleLogin} className="auth-form">
                         <div className="form-group">
-                            <label>Username or Email</label>
+                            <label>User ID, Phone Number, or Email Address</label>
                             <input
                                 type="text"
-                                placeholder="e.g. admin or operator"
+                                placeholder="e.g. admin, +1 555-0199, or operator@school.edu"
                                 value={usernameOrEmail}
                                 onChange={(e) => setUsernameOrEmail(e.target.value)}
                                 required
@@ -148,12 +148,15 @@ export default function AuthPage({ onAuthenticated }) {
                                 </button>
                                 <button
                                     type="button"
-                                    onClick={() => {
-                                        setUsernameOrEmail("operator");
-                                        setPassword("admin123");
-                                    }}
+                                    onClick={() => handleLogin(null, "operator", "admin123")}
                                 >
                                     Security Operator
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handleLogin(null, "analyst", "admin123")}
+                                >
+                                    Safety Analyst
                                 </button>
                             </div>
                         </div>
