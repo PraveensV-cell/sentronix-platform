@@ -5,6 +5,7 @@ from fastapi import status
 from sqlalchemy.orm import Session
 
 from src.database.session import get_db
+from src.dependencies.roles import RoleChecker
 from src.schemas.user import UserCreate
 from src.schemas.user import UserResponse
 from src.services.user import UserService
@@ -13,6 +14,8 @@ router = APIRouter(
     prefix="/users",
     tags=["Users"],
 )
+
+admin_only = RoleChecker(["super_admin"])
 
 
 @router.post(
@@ -23,6 +26,7 @@ router = APIRouter(
 def create_user(
     user: UserCreate,
     db: Session = Depends(get_db),
+    _current_user=Depends(admin_only),
 ):
     """
     Create a new user.
@@ -46,6 +50,7 @@ def create_user(
 )
 def list_users(
     db: Session = Depends(get_db),
+    _current_user=Depends(admin_only),
 ):
     """
     Return all users.
@@ -63,6 +68,7 @@ def list_users(
 def get_user(
     user_id: int,
     db: Session = Depends(get_db),
+    _current_user=Depends(admin_only),
 ):
     """
     Return one user.
@@ -87,6 +93,7 @@ def get_user(
 def delete_user(
     user_id: int,
     db: Session = Depends(get_db),
+    _current_user=Depends(admin_only),
 ):
     """
     Delete a user.
