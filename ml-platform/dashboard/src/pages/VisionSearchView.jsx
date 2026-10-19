@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { searchVisionEvents, getCameras } from "../api/api";
+import { searchVisionEvents, getCameras, getExportCsvUrl } from "../api/api";
 
 export default function VisionSearchView() {
     const [query, setQuery] = useState("");
@@ -323,7 +323,7 @@ export default function VisionSearchView() {
                                 </div>
                                 <div className="modal-actions-bar">
                                     <a
-                                        href={`http://127.0.0.1:8000/reports/export/csv?report_type=detections`}
+                                        href={getExportCsvUrl("detections")}
                                         className="btn-primary"
                                         target="_blank"
                                         rel="noreferrer"

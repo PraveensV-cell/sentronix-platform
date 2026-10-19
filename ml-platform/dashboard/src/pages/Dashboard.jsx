@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import "./Dashboard.css";
+import { API_BASE_URL } from "../api/api";
 
-const API_URL = "http://127.0.0.1:8000";
+const API_URL = API_BASE_URL;
 
 function Dashboard() {
     const [cameras, setCameras] = useState([]);

@@ -122,6 +122,7 @@ def open_capture_source(source):
         try:
             cap = cv2.VideoCapture(source)
             if cap.isOpened():
+                cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
                 return cap
             cap.release()
         except Exception:
@@ -168,9 +169,9 @@ def camera_worker(camera_id: str):
     while camera_running.get(str_id, False):
         raw_frame = None
 
-        # 1. Check if a mobile phone or remote browser uploaded a recent frame (< 2.5s ago)
+        # 1. Check if a mobile phone or remote browser uploaded a recent frame (< 10.0s ago)
         mobile_data = mobile_uploaded_frames.get(str_id)
-        if mobile_data is not None and (time.time() - mobile_data["timestamp"]) < 2.5:
+        if mobile_data is not None and (time.time() - mobile_data["timestamp"]) < 10.0:
             raw_frame = mobile_data["frame"]
 
         # 2. If no mobile frame, check hardware webcam / laptop camera
@@ -353,7 +354,7 @@ def camera_stream_status(camera_id: str):
     is_hardware = camera_instances.get(str_id) is not None
     has_mobile_stream = (
         str_id in mobile_uploaded_frames
-        and (time.time() - mobile_uploaded_frames[str_id]["timestamp"]) < 2.5
+        and (time.time() - mobile_uploaded_frames[str_id]["timestamp"]) < 10.0
     )
 
     return {

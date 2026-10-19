@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { getCameras, createCamera, getNetworkInfo, uploadCameraFrame } from "../api/api";
+import { getCameras, createCamera, getNetworkInfo, uploadCameraFrame, API_BASE_URL } from "../api/api";
 
 export default function CameraManagerView() {
     const [cameras, setCameras] = useState([]);
@@ -198,7 +198,7 @@ export default function CameraManagerView() {
 
                             <div className="card-actions-row">
                                 <a
-                                    href={`http://127.0.0.1:8000/stream/${c.id}`}
+                                    href={`${API_BASE_URL}/stream/${c.id}`}
                                     target="_blank"
                                     rel="noreferrer"
                                     className="btn-view-raw-stream"

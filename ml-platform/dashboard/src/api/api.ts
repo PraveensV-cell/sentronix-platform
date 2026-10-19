@@ -1,7 +1,21 @@
 import axios from "axios";
 
+export const getApiBaseUrl = (): string => {
+    if (
+        typeof window !== "undefined" &&
+        window.location.hostname &&
+        window.location.hostname !== "localhost" &&
+        window.location.hostname !== "127.0.0.1"
+    ) {
+        return `http://${window.location.hostname}:8000`;
+    }
+    return "http://127.0.0.1:8000";
+};
+
+export const API_BASE_URL = getApiBaseUrl();
+
 const API = axios.create({
-    baseURL: "http://127.0.0.1:8000",
+    baseURL: API_BASE_URL,
     headers: {
         "Content-Type": "application/json",
     },
@@ -237,7 +251,7 @@ export const getHardwareTelemetry = async () => {
 };
 
 export const getExportCsvUrl = (reportType: string = "attendance") => {
-    return `http://127.0.0.1:8000/reports/export/csv?report_type=${reportType}`;
+    return `${API_BASE_URL}/reports/export/csv?report_type=${reportType}`;
 };
 
 export const getNetworkInfo = async () => {

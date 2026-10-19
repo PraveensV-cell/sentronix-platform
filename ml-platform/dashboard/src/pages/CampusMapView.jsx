@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { getCameras, getAlerts } from "../api/api";
+import { getCameras, getAlerts, API_BASE_URL } from "../api/api";
 
 export default function CampusMapView() {
     const [cameras, setCameras] = useState([]);
@@ -186,7 +186,7 @@ export default function CampusMapView() {
                                 </div>
                                 <div className="mock-stream-display">
                                     <img
-                                        src={`http://127.0.0.1:8000/stream/1`}
+                                        src={`${API_BASE_URL}/stream/1`}
                                         alt="Stream Feed"
                                         className="stream-thumbnail"
                                     />
@@ -199,7 +199,7 @@ export default function CampusMapView() {
                                 </div>
                                 <div className="mock-stream-display">
                                     <img
-                                        src={`http://127.0.0.1:8000/stream/2`}
+                                        src={`${API_BASE_URL}/stream/2`}
                                         alt="Stream Feed"
                                         className="stream-thumbnail"
                                     />
