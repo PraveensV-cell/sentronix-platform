@@ -21,6 +21,7 @@ from api.people_api import router as people_router
 from api.attendance_api import router as attendance_router
 from api.rules_api import router as rules_router
 from api.assistant_api import router as assistant_router
+from api.vision_search_api import router as vision_search_router
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -47,6 +48,7 @@ app.include_router(people_router)
 app.include_router(attendance_router)
 app.include_router(rules_router)
 app.include_router(assistant_router)
+app.include_router(vision_search_router)
 
 # Analytics, Health & Monitoring Routers
 app.include_router(alert_router)

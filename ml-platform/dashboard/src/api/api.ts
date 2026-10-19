@@ -219,4 +219,25 @@ export const askAIAssistant = async (message: string) => {
     return res.data;
 };
 
+export const searchVisionEvents = async (params: {
+    q?: string;
+    camera_id?: string;
+    object_type?: string;
+    start_date?: string;
+    end_date?: string;
+    sort_by?: string;
+}) => {
+    const res = await API.get("/vision/search", { params });
+    return res.data;
+};
+
+export const getHardwareTelemetry = async () => {
+    const res = await API.get("/system/hardware-telemetry");
+    return res.data;
+};
+
+export const getExportCsvUrl = (reportType: string = "attendance") => {
+    return `http://127.0.0.1:8000/reports/export/csv?report_type=${reportType}`;
+};
+
 export default API;

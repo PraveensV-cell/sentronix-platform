@@ -1,12 +1,15 @@
 export default function Sidebar({ activeTab, setActiveTab, alertCount = 0 }) {
     const tabs = [
         { id: "surveillance", label: "Live Surveillance", icon: "📹" },
-        { id: "attendance", label: "Attendance System", icon: "🎓" },
+        { id: "map", label: "Campus Tactical Map", icon: "🗺️" },
+        { id: "vision_search", label: "VisionAI Search", icon: "✨" },
+        { id: "attendance", label: "Attendance & Timesheets", icon: "🎓" },
         { id: "alerts", label: "Security Alerts", icon: "🚨", badge: alertCount },
         { id: "people", label: "People & Faces", icon: "👥" },
         { id: "rules", label: "Policy & Rules", icon: "⚖️" },
         { id: "analytics", label: "Analytics & KPIs", icon: "📊" },
         { id: "cameras", label: "Camera Devices", icon: "⚙️" },
+        { id: "health", label: "System Health", icon: "🩺" },
     ];
 
     return (

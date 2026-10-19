@@ -7,12 +7,15 @@ import AuthPage from "./pages/AuthPage";
 import EnvironmentSelectPage from "./pages/EnvironmentSelectPage";
 
 import LiveSurveillanceView from "./pages/LiveSurveillanceView";
+import CampusMapView from "./pages/CampusMapView";
+import VisionSearchView from "./pages/VisionSearchView";
 import AttendanceView from "./pages/AttendanceView";
 import AlertsView from "./pages/AlertsView";
 import PeopleView from "./pages/PeopleView";
 import RulesView from "./pages/RulesView";
 import AnalyticsView from "./pages/AnalyticsView";
 import CameraManagerView from "./pages/CameraManagerView";
+import SystemHealthView from "./pages/SystemHealthView";
 
 import { getAlerts, getStatus } from "./api/api";
 import "./pages/Dashboard.css";
@@ -141,6 +144,10 @@ export default function App() {
                         />
                     )}
 
+                    {activeTab === "map" && <CampusMapView />}
+
+                    {activeTab === "vision_search" && <VisionSearchView />}
+
                     {activeTab === "attendance" && <AttendanceView />}
 
                     {activeTab === "alerts" && <AlertsView />}
@@ -152,6 +159,8 @@ export default function App() {
                     {activeTab === "analytics" && <AnalyticsView />}
 
                     {activeTab === "cameras" && <CameraManagerView />}
+
+                    {activeTab === "health" && <SystemHealthView />}
                 </main>
             </div>
 

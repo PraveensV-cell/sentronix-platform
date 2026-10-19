@@ -30,9 +30,12 @@ class TestSentronixFullStack(unittest.TestCase):
         self.assertEqual(data["ai"], "active")
 
     def test_02_auth_workflow(self):
+        import uuid
+
+        uid = uuid.uuid4().hex[:6]
         # Register new operator
-        username = "test_guard_1"
-        email = "guard1@school.edu"
+        username = f"test_guard_{uid}"
+        email = f"guard_{uid}@school.edu"
         reg_res = self.client.post(
             "/auth/register",
             json={
@@ -84,7 +87,10 @@ class TestSentronixFullStack(unittest.TestCase):
         self.assertGreaterEqual(len(cameras), 1)
 
     def test_05_people_and_face_enrollment(self):
-        identifier = "STU-999"
+        import uuid
+
+        uid = uuid.uuid4().hex[:6]
+        identifier = f"STU-{uid}"
         create_res = self.client.post(
             "/people",
             json={
