@@ -1,0 +1,239 @@
+ .gitattributes                                     |   8 [32m+[m[31m-[m
+ .../detector-v1/BoxF1_curve.png                    | Bin [31m0[m -> [32m58777[m bytes
+ .../detector-v1/BoxPR_curve.png                    | Bin [31m0[m -> [32m69454[m bytes
+ .../detector-v1/BoxP_curve.png                     | Bin [31m0[m -> [32m71605[m bytes
+ .../detector-v1/BoxR_curve.png                     | Bin [31m0[m -> [32m64886[m bytes
+ .../sentronix-detector-v1/detector-v1/args.yaml    | 116 [32m+++[m
+ .../detector-v1/confusion_matrix.png               | Bin [31m0[m -> [32m159349[m bytes
+ .../detector-v1/confusion_matrix_normalized.png    | Bin [31m0[m -> [32m169380[m bytes
+ .../sentronix-detector-v1/detector-v1/labels.jpg   | Bin [31m0[m -> [32m154062[m bytes
+ .../sentronix-detector-v1/detector-v1/results.csv  |  17 [32m+[m
+ .../sentronix-detector-v1/detector-v1/results.png  | Bin [31m0[m -> [32m274068[m bytes
+ .../detector-v1/train_batch0.jpg                   | Bin [31m0[m -> [32m85549[m bytes
+ .../detector-v1/train_batch1.jpg                   | Bin [31m0[m -> [32m81212[m bytes
+ .../detector-v1/train_batch2.jpg                   | Bin [31m0[m -> [32m96217[m bytes
+ .../detector-v1/val_batch0_labels.jpg              | Bin [31m0[m -> [32m78722[m bytes
+ .../detector-v1/val_batch0_pred.jpg                | Bin [31m0[m -> [32m66869[m bytes
+ .../detector-v1/weights/best.onnx                  |   3 [32m+[m
+ .../detector-v1/weights/best.pt                    |   3 [32m+[m
+ .../detector-v1/weights/last.pt                    |   3 [32m+[m
+ .../detector-v1/BoxF1_curve.png                    | Bin [31m0[m -> [32m59077[m bytes
+ .../detector-v1/BoxPR_curve.png                    | Bin [31m0[m -> [32m71512[m bytes
+ .../detector-v1/BoxP_curve.png                     | Bin [31m0[m -> [32m72228[m bytes
+ .../detector-v1/BoxR_curve.png                     | Bin [31m0[m -> [32m65304[m bytes
+ .../sentronix-detector-v1/detector-v1/args.yaml    | 116 [32m+++[m
+ .../detector-v1/confusion_matrix.png               | Bin [31m0[m -> [32m154857[m bytes
+ .../detector-v1/confusion_matrix_normalized.png    | Bin [31m0[m -> [32m161867[m bytes
+ .../sentronix-detector-v1/detector-v1/labels.jpg   | Bin [31m0[m -> [32m154062[m bytes
+ .../sentronix-detector-v1/detector-v1/results.csv  |  22 [32m+[m
+ .../sentronix-detector-v1/detector-v1/results.png  | Bin [31m0[m -> [32m261861[m bytes
+ .../detector-v1/train_batch0.jpg                   | Bin [31m0[m -> [32m189515[m bytes
+ .../detector-v1/train_batch1.jpg                   | Bin [31m0[m -> [32m223164[m bytes
+ .../detector-v1/train_batch2.jpg                   | Bin [31m0[m -> [32m165481[m bytes
+ .../detector-v1/val_batch0_labels.jpg              | Bin [31m0[m -> [32m300124[m bytes
+ .../detector-v1/val_batch0_pred.jpg                | Bin [31m0[m -> [32m260077[m bytes
+ .../detector-v1/val_batch1_labels.jpg              | Bin [31m0[m -> [32m176379[m bytes
+ .../detector-v1/val_batch1_pred.jpg                | Bin [31m0[m -> [32m155095[m bytes
+ .../detector-v1/weights/best.pt                    |   3 [32m+[m
+ .../detector-v1/weights/last.pt                    |   3 [32m+[m
+ .../evaluation/detector-evaluation/BoxF1_curve.png | Bin [31m0[m -> [32m58578[m bytes
+ .../evaluation/detector-evaluation/BoxPR_curve.png | Bin [31m0[m -> [32m71100[m bytes
+ .../evaluation/detector-evaluation/BoxP_curve.png  | Bin [31m0[m -> [32m71787[m bytes
+ .../evaluation/detector-evaluation/BoxR_curve.png  | Bin [31m0[m -> [32m64455[m bytes
+ .../detector-evaluation/confusion_matrix.png       | Bin [31m0[m -> [32m159502[m bytes
+ .../confusion_matrix_normalized.png                | Bin [31m0[m -> [32m161583[m bytes
+ .../detector-evaluation/predictions.json           |   1 [32m+[m
+ .../detector-evaluation/val_batch0_labels.jpg      | Bin [31m0[m -> [32m147085[m bytes
+ .../detector-evaluation/val_batch0_pred.jpg        | Bin [31m0[m -> [32m127071[m bytes
+ .../detector-evaluation/val_batch1_labels.jpg      | Bin [31m0[m -> [32m154547[m bytes
+ .../detector-evaluation/val_batch1_pred.jpg        | Bin [31m0[m -> [32m131383[m bytes
+ .../detector-evaluation/val_batch2_labels.jpg      | Bin [31m0[m -> [32m80484[m bytes
+ .../detector-evaluation/val_batch2_pred.jpg        | Bin [31m0[m -> [32m73039[m bytes
+ .../runs/rtdetr/security-v2-r50-2/args.yaml        | 115 [32m+++[m
+ .../runs/rtdetr/security-v2-r50-2/labels.jpg       | Bin [31m0[m -> [32m192426[m bytes
+ .../runs/rtdetr/security-v2-r50-2/results.csv      |   2 [32m+[m
+ .../runs/rtdetr/security-v2-r50-2/train_batch0.jpg | Bin [31m0[m -> [32m83468[m bytes
+ .../runs/rtdetr/security-v2-r50-2/train_batch1.jpg | Bin [31m0[m -> [32m88774[m bytes
+ .../runs/rtdetr/security-v2-r50-2/train_batch2.jpg | Bin [31m0[m -> [32m59967[m bytes
+ .../runs/rtdetr/security-v2-r50-2/weights/best.pt  |   3 [32m+[m
+ .../rtdetr/security-v2-r50-2/weights/epoch0.pt     |   3 [32m+[m
+ .../runs/rtdetr/security-v2-r50-2/weights/last.pt  |   3 [32m+[m
+ .../rtdetr/security-v2-r50-stability/args.yaml     | 115 [32m+++[m
+ .../rtdetr/security-v2-r50-stability/results.csv   |   2 [32m+[m
+ .../security-v2-r50-stability/weights/best.pt      |   3 [32m+[m
+ .../security-v2-r50-stability/weights/last.pt      |   3 [32m+[m
+ ml-platform/runs/rtdetr/security-v2-r50/args.yaml  | 115 [32m+++[m
+ ml-platform/runs/rtdetr/security-v2-r50/labels.jpg | Bin [31m0[m -> [32m192426[m bytes
+ .../runs/rtdetr/security-v2-r50/train_batch0.jpg   | Bin [31m0[m -> [32m83620[m bytes
+ .../runs/rtdetr/security-v2-r50/train_batch1.jpg   | Bin [31m0[m -> [32m27081[m bytes
+ .../runs/rtdetr/security-v2-r50/train_batch2.jpg   | Bin [31m0[m -> [32m48050[m bytes
+ .../yolo-world/first-test/bag_0038ac7f1f0e.jpg     | Bin [31m0[m -> [32m131001[m bytes
+ .../inference-preflight/bag_0038ac7f1f0e.jpg       | Bin [31m0[m -> [32m118886[m bytes
+ .../runs/yolo11s/inference-sample-10/image0.jpg    | Bin [31m0[m -> [32m138728[m bytes
+ .../runs/yolo11s/inference-sample-10/image1.jpg    | Bin [31m0[m -> [32m114131[m bytes
+ .../runs/yolo11s/inference-sample-10/image2.jpg    | Bin [31m0[m -> [32m41277[m bytes
+ .../runs/yolo11s/inference-sample-10/image3.jpg    | Bin [31m0[m -> [32m387855[m bytes
+ .../runs/yolo11s/inference-sample-10/image4.jpg    | Bin [31m0[m -> [32m98558[m bytes
+ .../runs/yolo11s/inference-sample-10/image5.jpg    | Bin [31m0[m -> [32m69732[m bytes
+ .../runs/yolo11s/inference-sample-10/image6.jpg    | Bin [31m0[m -> [32m61530[m bytes
+ .../runs/yolo11s/inference-sample-10/image7.jpg    | Bin [31m0[m -> [32m166001[m bytes
+ .../runs/yolo11s/inference-sample-10/image8.jpg    | Bin [31m0[m -> [32m31176[m bytes
+ .../runs/yolo11s/inference-sample-10/image9.jpg    | Bin [31m0[m -> [32m136416[m bytes
+ ml-platform/runs/yolo11s/preflight-check/args.yaml | 115 [32m+++[m
+ .../runs/yolo11s/preflight-check/results.csv       |   2 [32m+[m
+ .../runs/yolo11s/preflight-check/weights/best.pt   |   3 [32m+[m
+ .../runs/yolo11s/preflight-check/weights/last.pt   |   3 [32m+[m
+ .../runs/yolo11s/security-v2-benchmark/args.yaml   | 115 [32m+++[m
+ .../runs/yolo11s/security-v2-benchmark/results.csv |   2 [32m+[m
+ .../yolo11s/security-v2-benchmark/weights/best.pt  |   3 [32m+[m
+ .../yolo11s/security-v2-benchmark/weights/last.pt  |   3 [32m+[m
+ .../security-v2-full-25epochs/BoxF1_curve.png      | Bin [31m0[m -> [32m420761[m bytes
+ .../security-v2-full-25epochs/BoxPR_curve.png      | Bin [31m0[m -> [32m292610[m bytes
+ .../security-v2-full-25epochs/BoxP_curve.png       | Bin [31m0[m -> [32m375461[m bytes
+ .../security-v2-full-25epochs/BoxR_curve.png       | Bin [31m0[m -> [32m375212[m bytes
+ .../yolo11s/security-v2-full-25epochs/args.yaml    | 115 [32m+++[m
+ .../security-v2-full-25epochs/confusion_matrix.png | Bin [31m0[m -> [32m446593[m bytes
+ .../confusion_matrix_normalized.png                | Bin [31m0[m -> [32m533910[m bytes
+ .../yolo11s/security-v2-full-25epochs/labels.jpg   | Bin [31m0[m -> [32m192426[m bytes
+ .../yolo11s/security-v2-full-25epochs/results.csv  |  26 [32m+[m
+ .../yolo11s/security-v2-full-25epochs/results.png  | Bin [31m0[m -> [32m301677[m bytes
+ .../security-v2-full-25epochs/train_batch0.jpg     | Bin [31m0[m -> [32m172990[m bytes
+ .../security-v2-full-25epochs/train_batch1.jpg     | Bin [31m0[m -> [32m121323[m bytes
+ .../train_batch154740.jpg                          | Bin [31m0[m -> [32m104172[m bytes
+ .../train_batch154741.jpg                          | Bin [31m0[m -> [32m137311[m bytes
+ .../train_batch154742.jpg                          | Bin [31m0[m -> [32m99216[m bytes
+ .../security-v2-full-25epochs/train_batch2.jpg     | Bin [31m0[m -> [32m122836[m bytes
+ .../val_batch0_labels.jpg                          | Bin [31m0[m -> [32m209515[m bytes
+ .../security-v2-full-25epochs/val_batch0_pred.jpg  | Bin [31m0[m -> [32m214949[m bytes
+ .../val_batch1_labels.jpg                          | Bin [31m0[m -> [32m196520[m bytes
+ .../security-v2-full-25epochs/val_batch1_pred.jpg  | Bin [31m0[m -> [32m198655[m bytes
+ .../val_batch2_labels.jpg                          | Bin [31m0[m -> [32m266465[m bytes
+ .../security-v2-full-25epochs/val_batch2_pred.jpg  | Bin [31m0[m -> [32m270360[m bytes
+ .../security-v2-full-25epochs/weights/best.pt      |   3 [32m+[m
+ .../security-v2-full-25epochs/weights/last.pt      |   3 [32m+[m
+ ml-platform/scripts/audit_security_v2.py           | 915 [32m+++++++++++++++++++++[m
+ ml-platform/scripts/convert_knife_voc_to_yolo.py   | 183 [32m+++++[m
+ ml-platform/scripts/convert_pistol_voc_to_yolo.py  | 200 [32m+++++[m
+ ml-platform/scripts/convert_ppe_dataset.py         | 208 [32m+++[m[31m--[m
+ .../scripts/convert_sohas_weapon_voc_final.py      | 225 [32m+++++[m
+ ml-platform/scripts/convert_sohas_weapon_yolo.py   | 162 [32m++++[m
+ ml-platform/scripts/merge_security_v2.py           | 770 [32m+++++++++++++++++[m
+ ml-platform/scripts/prepare_coco_person_subset.py  | 149 [32m++++[m
+ ml-platform/scripts/prepare_crowd_dataset.py       |  89 [32m++[m
+ ml-platform/scripts/prepare_dress_code_dataset.py  | 114 [32m+++[m
+ ml-platform/scripts/prepare_id_card_dataset.py     |  92 [32m+++[m
+ ml-platform/scripts/prepare_saree_dataset.py       |  78 [32m++[m
+ .../scripts/prepare_traditional_dress_dataset.py   | 146 [32m++++[m
+ ml-platform/scripts/prepare_vehicle_dataset.py     | 151 [32m++++[m
+ .../training/configs/rtdetr-r50-security-v2.yaml   |  42 [32m+[m
+ .../training/configs/sentronix-security-v2.yaml    |  34 [32m+[m
+ ml-platform/training/sentronix_weighted_trainer.py |  75 [32m++[m
+ runs/detect/demo-final-yolo11n-2/AoF06978.jpg      | Bin [31m0[m -> [32m266917[m bytes
+ runs/detect/demo-final-yolo11n/WEB11791.jpg        | Bin [31m0[m -> [32m183859[m bytes
+ runs/detect/demo-final-yolo11s/AoF06978.jpg        | Bin [31m0[m -> [32m276268[m bytes
+ runs/detect/demo-final-yolo11syolo/AoF06978.jpg    | Bin [31m0[m -> [32m276268[m bytes
+ runs/detect/demo-final-yolo26n-2/AoF06978.jpg      | Bin [31m0[m -> [32m275740[m bytes
+ runs/detect/demo-final-yolo26n/AoF06978.jpg        | Bin [31m0[m -> [32m275740[m bytes
+ runs/detect/demo-yolo11n-2/AoF06724.jpg            | Bin [31m0[m -> [32m374515[m bytes
+ runs/detect/demo-yolo11n-3/AoF06726.jpg            | Bin [31m0[m -> [32m352657[m bytes
+ runs/detect/demo-yolo11n/AoF06723.jpg              | Bin [31m0[m -> [32m336959[m bytes
+ runs/detect/demo-yolo11s-2/AoF06724.jpg            | Bin [31m0[m -> [32m374515[m bytes
+ runs/detect/demo-yolo11s-3/AoF06729.jpg            | Bin [31m0[m -> [32m84100[m bytes
+ runs/detect/demo-yolo11s/AoF06724.jpg              | Bin [31m0[m -> [32m374515[m bytes
+ runs/detect/demo-yolo26n/AoF06724.jpg              | Bin [31m0[m -> [32m374515[m bytes
+ runs/detect/predict-2/bus.jpg                      | Bin [31m0[m -> [32m362664[m bytes
+ runs/detect/predict-2/zidane.jpg                   | Bin [31m0[m -> [32m157289[m bytes
+ .../BoxF1_curve.png                                | Bin [31m0[m -> [32m142017[m bytes
+ .../BoxPR_curve.png                                | Bin [31m0[m -> [32m136218[m bytes
+ .../sentronix-fire-smoke-yolo11s-v1/BoxP_curve.png | Bin [31m0[m -> [32m130131[m bytes
+ .../sentronix-fire-smoke-yolo11s-v1/BoxR_curve.png | Bin [31m0[m -> [32m141381[m bytes
+ .../sentronix-fire-smoke-yolo11s-v1/args.yaml      | 115 [32m+++[m
+ .../confusion_matrix.png                           | Bin [31m0[m -> [32m108934[m bytes
+ .../confusion_matrix_normalized.png                | Bin [31m0[m -> [32m113791[m bytes
+ .../sentronix-fire-smoke-yolo11s-v1/labels.jpg     | Bin [31m0[m -> [32m126349[m bytes
+ .../sentronix-fire-smoke-yolo11s-v1/results.csv    | 101 [32m+++[m
+ .../sentronix-fire-smoke-yolo11s-v1/results.png    | Bin [31m0[m -> [32m258685[m bytes
+ .../train_batch0.jpg                               | Bin [31m0[m -> [32m491602[m bytes
+ .../train_batch1.jpg                               | Bin [31m0[m -> [32m288393[m bytes
+ .../train_batch164700.jpg                          | Bin [31m0[m -> [32m334799[m bytes
+ .../train_batch164701.jpg                          | Bin [31m0[m -> [32m355253[m bytes
+ .../train_batch164702.jpg                          | Bin [31m0[m -> [32m255560[m bytes
+ .../train_batch2.jpg                               | Bin [31m0[m -> [32m393974[m bytes
+ .../val_batch0_labels.jpg                          | Bin [31m0[m -> [32m349430[m bytes
+ .../val_batch0_pred.jpg                            | Bin [31m0[m -> [32m357375[m bytes
+ .../val_batch1_labels.jpg                          | Bin [31m0[m -> [32m316149[m bytes
+ .../val_batch1_pred.jpg                            | Bin [31m0[m -> [32m321148[m bytes
+ .../val_batch2_labels.jpg                          | Bin [31m0[m -> [32m290098[m bytes
+ .../val_batch2_pred.jpg                            | Bin [31m0[m -> [32m298059[m bytes
+ .../weights/best.pt                                |   3 [32m+[m
+ .../weights/last.pt                                |   3 [32m+[m
+ runs/detect/test-low-conf/AoF06724.jpg             | Bin [31m0[m -> [32m374515[m bytes
+ runs/detect/train-2/BoxF1_curve.png                | Bin [31m0[m -> [32m136631[m bytes
+ runs/detect/train-2/BoxPR_curve.png                | Bin [31m0[m -> [32m146980[m bytes
+ runs/detect/train-2/BoxP_curve.png                 | Bin [31m0[m -> [32m135885[m bytes
+ runs/detect/train-2/BoxR_curve.png                 | Bin [31m0[m -> [32m127531[m bytes
+ runs/detect/train-2/args.yaml                      | 115 [32m+++[m
+ runs/detect/train-2/confusion_matrix.png           | Bin [31m0[m -> [32m103763[m bytes
+ .../detect/train-2/confusion_matrix_normalized.png | Bin [31m0[m -> [32m113813[m bytes
+ runs/detect/train-2/labels.jpg                     | Bin [31m0[m -> [32m126349[m bytes
+ runs/detect/train-2/results.csv                    |   4 [32m+[m
+ runs/detect/train-2/results.png                    | Bin [31m0[m -> [32m253477[m bytes
+ runs/detect/train-2/train_batch0.jpg               | Bin [31m0[m -> [32m491602[m bytes
+ runs/detect/train-2/train_batch1.jpg               | Bin [31m0[m -> [32m288393[m bytes
+ runs/detect/train-2/train_batch2.jpg               | Bin [31m0[m -> [32m393974[m bytes
+ runs/detect/train-2/val_batch0_labels.jpg          | Bin [31m0[m -> [32m349430[m bytes
+ runs/detect/train-2/val_batch0_pred.jpg            | Bin [31m0[m -> [32m348998[m bytes
+ runs/detect/train-2/val_batch1_labels.jpg          | Bin [31m0[m -> [32m316149[m bytes
+ runs/detect/train-2/val_batch1_pred.jpg            | Bin [31m0[m -> [32m319384[m bytes
+ runs/detect/train-2/val_batch2_labels.jpg          | Bin [31m0[m -> [32m290098[m bytes
+ runs/detect/train-2/val_batch2_pred.jpg            | Bin [31m0[m -> [32m296409[m bytes
+ runs/detect/train-2/weights/best.pt                |   3 [32m+[m
+ runs/detect/train-2/weights/last.pt                |   3 [32m+[m
+ runs/detect/train-3/args.yaml                      | 115 [32m+++[m
+ runs/detect/train-4/args.yaml                      | 115 [32m+++[m
+ runs/detect/train-5/args.yaml                      | 115 [32m+++[m
+ runs/detect/train-6/args.yaml                      | 115 [32m+++[m
+ runs/detect/train-7/args.yaml                      | 115 [32m+++[m
+ runs/detect/train-8/args.yaml                      | 115 [32m+++[m
+ runs/detect/train/args.yaml                        | 115 [32m+++[m
+ runs/detect/val-2/BoxF1_curve.png                  | Bin [31m0[m -> [32m142148[m bytes
+ runs/detect/val-2/BoxPR_curve.png                  | Bin [31m0[m -> [32m135266[m bytes
+ runs/detect/val-2/BoxP_curve.png                   | Bin [31m0[m -> [32m129735[m bytes
+ runs/detect/val-2/BoxR_curve.png                   | Bin [31m0[m -> [32m141600[m bytes
+ runs/detect/val-2/confusion_matrix.png             | Bin [31m0[m -> [32m108675[m bytes
+ runs/detect/val-2/confusion_matrix_normalized.png  | Bin [31m0[m -> [32m113449[m bytes
+ runs/detect/val-2/val_batch0_labels.jpg            | Bin [31m0[m -> [32m349215[m bytes
+ runs/detect/val-2/val_batch0_pred.jpg              | Bin [31m0[m -> [32m356975[m bytes
+ runs/detect/val-2/val_batch1_labels.jpg            | Bin [31m0[m -> [32m315940[m bytes
+ runs/detect/val-2/val_batch1_pred.jpg              | Bin [31m0[m -> [32m320995[m bytes
+ runs/detect/val-2/val_batch2_labels.jpg            | Bin [31m0[m -> [32m289881[m bytes
+ runs/detect/val-2/val_batch2_pred.jpg              | Bin [31m0[m -> [32m298140[m bytes
+ runs/detect/val-3/BoxF1_curve.png                  | Bin [31m0[m -> [32m136714[m bytes
+ runs/detect/val-3/BoxPR_curve.png                  | Bin [31m0[m -> [32m146719[m bytes
+ runs/detect/val-3/BoxP_curve.png                   | Bin [31m0[m -> [32m136615[m bytes
+ runs/detect/val-3/BoxR_curve.png                   | Bin [31m0[m -> [32m127101[m bytes
+ runs/detect/val-3/confusion_matrix.png             | Bin [31m0[m -> [32m103336[m bytes
+ runs/detect/val-3/confusion_matrix_normalized.png  | Bin [31m0[m -> [32m113521[m bytes
+ runs/detect/val-3/val_batch0_labels.jpg            | Bin [31m0[m -> [32m349215[m bytes
+ runs/detect/val-3/val_batch0_pred.jpg              | Bin [31m0[m -> [32m348809[m bytes
+ runs/detect/val-3/val_batch1_labels.jpg            | Bin [31m0[m -> [32m315940[m bytes
+ runs/detect/val-3/val_batch1_pred.jpg              | Bin [31m0[m -> [32m318931[m bytes
+ runs/detect/val-3/val_batch2_labels.jpg            | Bin [31m0[m -> [32m289881[m bytes
+ runs/detect/val-3/val_batch2_pred.jpg              | Bin [31m0[m -> [32m296015[m bytes
+ runs/detect/val-4/BoxF1_curve.png                  | Bin [31m0[m -> [32m142148[m bytes
+ runs/detect/val-4/BoxPR_curve.png                  | Bin [31m0[m -> [32m135266[m bytes
+ runs/detect/val-4/BoxP_curve.png                   | Bin [31m0[m -> [32m129735[m bytes
+ runs/detect/val-4/BoxR_curve.png                   | Bin [31m0[m -> [32m141600[m bytes
+ runs/detect/val-4/confusion_matrix.png             | Bin [31m0[m -> [32m108675[m bytes
+ runs/detect/val-4/confusion_matrix_normalized.png  | Bin [31m0[m -> [32m113449[m bytes
+ runs/detect/val-4/val_batch0_labels.jpg            | Bin [31m0[m -> [32m349215[m bytes
+ runs/detect/val-4/val_batch0_pred.jpg              | Bin [31m0[m -> [32m356975[m bytes
+ runs/detect/val-4/val_batch1_labels.jpg            | Bin [31m0[m -> [32m315940[m bytes
+ runs/detect/val-4/val_batch1_pred.jpg              | Bin [31m0[m -> [32m320995[m bytes
+ runs/detect/val-4/val_batch2_labels.jpg            | Bin [31m0[m -> [32m289881[m bytes
+ runs/detect/val-4/val_batch2_pred.jpg              | Bin [31m0[m -> [32m298140[m bytes
+ runs/detect/val-5/BoxF1_curve.png                  | Bin [31m0[m -> [32m140341[m bytes
+ runs/detect/val-5/BoxPR_curve.png                  | Bin [31m0[m -> [32m143387[m bytes
+ runs/detect/val-5/BoxP_curve.png                   | Bin [31m0[m -> [32m129670[m bytes
+ runs/detect/val-5/BoxR_curve.png                   | Bin [31m0[m -> [32m141471[m bytes
+ runs/detect/val-5/confusion_matrix.png             

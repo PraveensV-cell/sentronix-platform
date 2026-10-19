@@ -1,0 +1,34 @@
+path: D:/majorproject/sentronix-platform/ml-platform/datasets/processed/sentronix-security-v2
+
+train: train/images
+val: val/images
+test: test/images
+
+nc: 25
+
+names:
+  0: person
+  1: fire
+  2: smoke
+  3: pistol
+  4: knife
+  5: helmet
+  6: no-helmet
+  7: vest
+  8: no-vest
+  9: boots
+  10: no-boots
+  11: gloves
+  12: no-gloves
+  13: goggles
+  14: no-goggles
+  15: autorickshaw
+  16: bicycle
+  17: bus
+  18: car
+  19: motorcycle
+  20: truck
+  21: backpack
+  22: handbag
+  23: laptop
+  24: suitcase
