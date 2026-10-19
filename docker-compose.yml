@@ -8,7 +8,7 @@ services:
     restart: unless-stopped
 
     env_file:
-      - ./infrastructure/postgres/postgres.env
+      - ./.env
 
     ports:
       - "5432:5432"
@@ -59,9 +59,8 @@ services:
 
     restart: unless-stopped
 
-    environment:
-      PGADMIN_DEFAULT_EMAIL: admin@sentronix.com
-      PGADMIN_DEFAULT_PASSWORD: admin123
+    env_file:
+      - ./.env
 
     ports:
       - "5050:80"
@@ -82,7 +81,7 @@ services:
       - "8000:8000"
 
     env_file:
-      - ./services/api-gateway/.env
+      - ./.env
 
     depends_on:
       postgres:
@@ -103,7 +102,13 @@ services:
       - "8001:8001"
 
     env_file:
-      - ./services/ai-service/.env
+      - ./.env
+
+    environment:
+      YOLO_MODEL: ${YOLO_MODEL:-yolov8n.pt}
+
+    volumes:
+      - ${SENTRONIX_MODELS_DIR:-./models}:/models:ro
 
     depends_on:
       api-gateway:
@@ -120,7 +125,7 @@ services:
       - "8002:8002"
 
     env_file:
-      - ./services/camera-service/.env
+      - ./.env
 
     depends_on:
       api-gateway:
@@ -137,7 +142,7 @@ services:
       - "8003:8003"
 
     env_file:
-      - ./services/device-service/.env
+      - ./.env
 
     depends_on:
       api-gateway:
@@ -154,7 +159,7 @@ services:
       - "8004:8004"
 
     env_file:
-      - ./services/event-service/.env
+      - ./.env
 
     depends_on:
       api-gateway:
@@ -171,7 +176,7 @@ services:
       - "8005:8005"
 
     env_file:
-      - ./services/notification-service/.env
+      - ./.env
 
     depends_on:
       api-gateway:
@@ -188,7 +193,7 @@ services:
       - "8006:8006"
 
     env_file:
-      - ./services/storage-service/.env
+      - ./.env
 
     depends_on:
       api-gateway:
@@ -205,7 +210,7 @@ services:
       - "8007:8007"
 
     env_file:
-      - ./services/analytics-service/.env
+      - ./.env
 
     depends_on:
       api-gateway:

@@ -4,6 +4,7 @@ from src.auth.password import hash_password
 from src.models.user import User
 from src.repositories.user_repository import UserRepository
 from src.schemas.user import UserCreate
+from src.schemas.user import UserRegistration
 
 
 class UserService:
@@ -16,9 +17,21 @@ class UserService:
 
     def create_user(self, user_data: UserCreate) -> User:
         """
-        Create a new user.
+        Create a user with an explicitly selected, validated role.
         """
 
+        return self._create_user(user_data, role=user_data.role)
+
+    def register_user(self, user_data: UserRegistration) -> User:
+        """Register a public account with the least-privileged role."""
+
+        return self._create_user(user_data, role="viewer")
+
+    def _create_user(
+        self,
+        user_data: UserCreate | UserRegistration,
+        role: str,
+    ) -> User:
         existing_username = self.repository.get_by_username(user_data.username)
 
         if existing_username:
@@ -34,7 +47,7 @@ class UserService:
             email=user_data.email,
             full_name=user_data.full_name,
             hashed_password=hash_password(user_data.password),
-            role=user_data.role,
+            role=role,
             is_active=True,
         )
 
