@@ -1,0 +1,28 @@
+# ==========================================================
+# SENTRONIX AI PLATFORM - SYSTEMD SERVICE UNIT
+# Install path: /etc/systemd/system/sentronix.service
+# Usage:
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable sentronix
+#   sudo systemctl start sentronix
+#   sudo systemctl status sentronix
+# ==========================================================
+
+[Unit]
+Description=Sentronix AI Surveillance & Safety Operations Platform
+After=network.target postgresql.service redis.service
+
+[Service]
+Type=simple
+User=sentronix
+Group=sentronix
+WorkingDirectory=/opt/sentronix-platform
+Environment="PATH=/opt/sentronix-platform/.venv/bin"
+EnvironmentFile=/opt/sentronix-platform/.env
+ExecStart=/opt/sentronix-platform/.venv/bin/python start_sentronix.py
+Restart=always
+RestartSec=5s
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

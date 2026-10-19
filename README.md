@@ -318,14 +318,33 @@ Validates:
 
 ---
 
-## 25. Production Deployment
+## 25. Production Deployment & Cloud Hosting
 
-To run in Docker Compose:
+### Step 1: Pre-Flight Host Diagnostics
+Run the automated verification script to confirm database, model weights, and dependencies:
 ```bash
-docker compose up --build
+python scripts/verify_host.py
 ```
-This boots all backend microservices, PostgreSQL, Redis, RabbitMQ, and the frontend container.
 
----
+### Step 2: Full-Stack Docker Compose Deployment
+To launch the complete containerized cluster (Frontend Nginx Reverse Proxy, Master AI Backend, PostgreSQL 16, Redis 7, RabbitMQ 3):
+```bash
+docker compose -f docker-compose.prod.yml up -d --build
+```
+Access points:
+* **Command Center Dashboard**: `http://localhost` (Port 80 / 5173)
+* **API Gateway & Swagger Docs**: `http://localhost:8000/docs`
+* **PostgreSQL Database**: Port `5432`
+* **Redis Bus**: Port `6379`
+* **RabbitMQ Console**: `http://localhost:15672`
+
+### Step 3: Turnkey Native Launchers
+* **Windows**: Run `start_production.bat` or `python start_sentronix.py`
+* **Linux / Cloud VMs (Ubuntu, AWS EC2)**:
+  ```bash
+  chmod +x start_production.sh
+  ./start_production.sh
+  ```
+* **Systemd Service**: Template available at [`deployment/sentronix.service`](file:///d:/majorproject/sentronix-platform/deployment/sentronix.service).
 
 **Prepared by Praveen S — Sentronix AI Surveillance & Safety Platform**

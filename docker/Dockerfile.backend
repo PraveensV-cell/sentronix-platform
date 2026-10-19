@@ -1,0 +1,49 @@
+# ==========================================================
+# SENTRONIX AI PLATFORM - PRODUCTION BACKEND DOCKERFILE
+# ==========================================================
+
+FROM python:3.11-slim
+
+WORKDIR /app
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app/ml-platform \
+    PORT=8000
+
+# Install system dependencies for OpenCV, multimedia & SQLite
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ffmpeg \
+    libgl1 \
+    libglib2.0-0 \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy core requirements and install dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir \
+    fastapi==0.139.2 \
+    uvicorn==0.51.0 \
+    pydantic==2.13.4 \
+    python-dotenv==1.2.2 \
+    opencv-python-headless \
+    numpy \
+    torch torchvision --index-url https://download.pytorch.org/whl/cpu \
+    ultralytics \
+    httpx
+
+# Copy ml-platform source code and models
+COPY ml-platform/ /app/ml-platform/
+COPY weights/ /app/weights/ 2>/dev/null || true
+COPY yolo11n.pt yolo11s.pt /app/ 2>/dev/null || true
+
+# Initialize database schema on startup
+RUN python -c "import sys; sys.path.insert(0, '/app/ml-platform'); from database.database_schema import init_database, seed_default_environment_and_rules; init_database(); seed_default_environment_and_rules()"
+
+EXPOSE 8000
+
+HEALTHCHECK --interval=15s --timeout=5s --retries=3 \
+    CMD curl -f http://localhost:8000/status || exit 1
+
+CMD ["python", "-m", "uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]

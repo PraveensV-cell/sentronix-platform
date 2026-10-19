@@ -1,0 +1,126 @@
+# ==========================================================
+# SENTRONIX AI PLATFORM - PRODUCTION HOSTING ORCHESTRATION
+# ==========================================================
+version: "3.8"
+
+services:
+  # ========================================================
+  # FRONTEND COMMAND CENTER (Nginx Reverse Proxy + React)
+  # ========================================================
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.frontend
+    container_name: sentronix-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "5173:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - sentronix-network
+
+  # ========================================================
+  # MASTER AI BACKEND (FastAPI + YOLO + OpenCV + Biometrics)
+  # ========================================================
+  backend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backend
+    container_name: sentronix-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=production
+      - AI_DEVICE=cpu
+      - DATABASE_PATH=/app/ml-platform/database/sentronix.db
+      - REDIS_URL=redis://redis:6379/0
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+    volumes:
+      - sentronix_db_data:/app/ml-platform/database
+      - sentronix_evidence:/app/ml-platform/evidence
+      - ./weights:/app/weights:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/status"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - sentronix-network
+
+  # ========================================================
+  # PRIMARY RELATIONAL DATABASE (PostgreSQL 16)
+  # ========================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: sentronix-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-sentronix_db}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sentronix_secure_pass}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - sentronix-network
+
+  # ========================================================
+  # IN-MEMORY CACHE & EVENT BUS (Redis 7)
+  # ========================================================
+  redis:
+    image: redis:7-alpine
+    container_name: sentronix-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - sentronix-network
+
+  # ========================================================
+  # ASYNC TASK BROKER (RabbitMQ 3 Management)
+  # ========================================================
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: sentronix-rabbitmq
+    restart: unless-stopped
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - sentronix-network
+
+volumes:
+  sentronix_db_data:
+    driver: local
+  sentronix_evidence:
+    driver: local
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  rabbitmq_data:
+    driver: local
+
+networks:
+  sentronix-network:
+    driver: bridge
