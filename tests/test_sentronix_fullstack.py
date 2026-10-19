@@ -178,6 +178,39 @@ class TestSentronixFullStack(unittest.TestCase):
         self.assertEqual(res3.status_code, 200)
         self.assertEqual(res3.json()["tool_called"], "get_alerts")
 
+    def test_10_camera_streaming_and_mobile_upload(self):
+        # 1. Test network info endpoint
+        net_res = self.client.get("/stream/network-info")
+        self.assertEqual(net_res.status_code, 200)
+        data = net_res.json()
+        self.assertIn("local_ip", data)
+        self.assertIn("mobile_dashboard_url", data)
+
+        # 2. Test status endpoint
+        status_res = self.client.get("/stream")
+        self.assertEqual(status_res.status_code, 200)
+
+        # 3. Test mobile frame upload
+        import cv2
+        import numpy as np
+
+        # Create a blank test image
+        img = np.zeros((480, 640, 3), dtype=np.uint8)
+        _, img_encoded = cv2.imencode(".jpg", img)
+        img_bytes = img_encoded.tobytes()
+
+        upload_res = self.client.post(
+            "/stream/1/upload-frame",
+            files={"file": ("frame.jpg", img_bytes, "image/jpeg")},
+        )
+        self.assertEqual(upload_res.status_code, 200)
+        self.assertTrue(upload_res.json()["success"])
+
+        # Check camera 1 status reflects the mobile upload
+        cam_stat = self.client.get("/stream/1/status")
+        self.assertEqual(cam_stat.status_code, 200)
+        self.assertTrue(cam_stat.json()["has_mobile_stream"])
+
 
 if __name__ == "__main__":
     unittest.main()

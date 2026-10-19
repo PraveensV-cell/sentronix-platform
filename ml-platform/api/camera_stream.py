@@ -1,12 +1,16 @@
+import os
+import socket
+import sqlite3
 import threading
 import time
-import sqlite3
 from pathlib import Path
+
 import cv2
-from fastapi import APIRouter
+import numpy as np
+from fastapi import APIRouter, File, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 
-from api.vision_engine import process_frame, generate_synthetic_frame
+from api.vision_engine import generate_synthetic_frame, process_frame
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATABASE_PATH = BASE_DIR / "database" / "sentronix.db"
@@ -22,6 +26,7 @@ camera_threads = {}
 camera_frames = {}
 camera_running = {}
 camera_info = {}
+mobile_uploaded_frames = {}  # {camera_id: {"frame": np.ndarray, "timestamp": float}}
 
 
 def get_db_connection():
@@ -31,10 +36,22 @@ def get_db_connection():
     return conn
 
 
+def get_local_ip() -> str:
+    """Detect local network LAN IP so mobile phones can connect over Wi-Fi."""
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+    except Exception:
+        ip = "127.0.0.1"
+    finally:
+        s.close()
+    return ip
+
+
 def get_camera_source_info(camera_id: str):
     conn = get_db_connection()
     try:
-        # Try finding by numeric id or camera_id / camera_name
         row = None
         if str(camera_id).isdigit():
             row = conn.execute(
@@ -63,6 +80,56 @@ def get_camera_source_info(camera_id: str):
         conn.close()
 
 
+def open_capture_source(source):
+    """
+    Open webcam / camera source with fallback & DirectShow on Windows.
+    Supports laptop built-in webcams, USB webcams, phone RTSP streams, and IP Webcams.
+    """
+    if source is None:
+        source = 0
+
+    # Numeric index (built-in laptop webcam: 0, external USB: 1 or 2)
+    if isinstance(source, int) or (isinstance(source, str) and str(source).isdigit()):
+        idx = int(source)
+
+        # On Windows, try DirectShow (CAP_DSHOW) first for fast webcam detection & 720p HD
+        if os.name == "nt":
+            try:
+                cap = cv2.VideoCapture(idx, cv2.CAP_DSHOW)
+                if cap.isOpened():
+                    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+                    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+                    return cap
+                cap.release()
+            except Exception:
+                pass
+
+        # Standard OpenCV fallback
+        try:
+            cap = cv2.VideoCapture(idx)
+            if cap.isOpened():
+                return cap
+            cap.release()
+        except Exception:
+            pass
+
+    # Network Stream: Phone IP Webcam (http://...), DroidCam, or RTSP stream
+    elif isinstance(source, str) and (
+        source.startswith("http://")
+        or source.startswith("https://")
+        or source.startswith("rtsp://")
+    ):
+        try:
+            cap = cv2.VideoCapture(source)
+            if cap.isOpened():
+                return cap
+            cap.release()
+        except Exception:
+            pass
+
+    return None
+
+
 def get_camera(camera_id: str):
     str_id = str(camera_id)
     if str_id not in camera_running or not camera_running[str_id]:
@@ -70,17 +137,7 @@ def get_camera(camera_id: str):
         camera_info[str_id] = info
 
         source = info.get("source_url", "0")
-        if str(source).isdigit():
-            source = int(source)
-
-        cam_obj = None
-        try:
-            cam_obj = cv2.VideoCapture(source)
-            if not cam_obj.isOpened():
-                cam_obj.release()
-                cam_obj = None
-        except Exception:
-            cam_obj = None
+        cam_obj = open_capture_source(source)
 
         camera_instances[str_id] = cam_obj
         camera_locks[str_id] = threading.Lock()
@@ -104,22 +161,39 @@ def camera_worker(camera_id: str):
     info = camera_info.get(str_id, {})
     cam_name = info.get("camera_name", f"Camera {str_id}")
     db_id = info.get("id", 1)
+    source = info.get("source_url", "0")
 
     frame_counter = 0
 
     while camera_running.get(str_id, False):
         raw_frame = None
 
-        if cam is not None and cam.isOpened():
-            success, read_frame = cam.read()
-            if success:
-                raw_frame = read_frame
+        # 1. Check if a mobile phone or remote browser uploaded a recent frame (< 2.5s ago)
+        mobile_data = mobile_uploaded_frames.get(str_id)
+        if mobile_data is not None and (time.time() - mobile_data["timestamp"]) < 2.5:
+            raw_frame = mobile_data["frame"]
 
-        # Fallback to high-fidelity simulated surveillance stream if hardware camera is not available
+        # 2. If no mobile frame, check hardware webcam / laptop camera
+        if raw_frame is None and cam is not None and cam.isOpened():
+            success, read_frame = cam.read()
+            if success and read_frame is not None and read_frame.size > 0:
+                raw_frame = read_frame
+            else:
+                # Device might have been unplugged or is in use
+                cam.release()
+                cam = None
+
+        # 3. Dynamic Re-probe: If camera is currently None, attempt reconnection every 50 frames (~2s)
+        # This guarantees that when the user plugs in a USB webcam or enables laptop camera, it connects live!
+        if raw_frame is None and cam is None and (frame_counter % 50 == 0):
+            cam = open_capture_source(source)
+            camera_instances[str_id] = cam
+
+        # 4. Fallback: If hardware camera is offline and no mobile feed, use synthetic surveillance feed
         if raw_frame is None:
             raw_frame = generate_synthetic_frame(frame_counter, cam_name, db_id)
 
-        # Run multi-stage AI perception (YOLO, Face Detection, Attendance, Alerts)
+        # Run multi-stage AI perception (YOLOv11s, Face Detection, Attendance, Alerts)
         processed = process_frame(raw_frame, cam_name, db_id)
 
         lock = camera_locks.get(str_id)
@@ -173,6 +247,51 @@ def stop_camera(camera_id: str):
     camera_frames.pop(str_id, None)
 
 
+@router.get("/network-info")
+def get_network_info():
+    """Returns local network LAN IP and connection URLs for mobile camera usage."""
+    local_ip = get_local_ip()
+    return {
+        "local_ip": local_ip,
+        "mobile_dashboard_url": f"http://{local_ip}:5173",
+        "api_stream_url": f"http://{local_ip}:8000/stream/1",
+        "instructions": {
+            "option_1_browser_camera": f"Open http://{local_ip}:5173 on your mobile browser (same Wi-Fi) and tap 'Broadcast Phone Camera'",
+            "option_2_ip_webcam_app": "Install free 'IP Webcam' on Android/iOS, tap 'Start Server', and enter the displayed URL (e.g. http://192.168.1.X:8080/video) into Sentronix Camera Manager.",
+            "option_3_laptop_webcam": "Make sure Camera index is set to 0 in Camera Devices to use your built-in laptop camera.",
+        },
+    }
+
+
+@router.post("/{camera_id}/upload-frame")
+async def upload_camera_frame(camera_id: str, file: UploadFile = File(...)):
+    """Accepts live video frames sent from mobile phones or remote webcams."""
+    str_id = str(camera_id)
+    contents = await file.read()
+    nparr = np.frombuffer(contents, np.uint8)
+    frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+    if frame is None or frame.size == 0:
+        raise HTTPException(
+            status_code=400, detail="Invalid image payload received from device"
+        )
+
+    # Store frame in mobile frame cache
+    mobile_uploaded_frames[str_id] = {
+        "frame": frame,
+        "timestamp": time.time(),
+    }
+
+    # Ensure worker thread is initialized
+    get_camera(str_id)
+
+    return {
+        "success": True,
+        "message": f"Frame received for Camera {camera_id}",
+        "dimensions": f"{frame.shape[1]}x{frame.shape[0]}",
+    }
+
+
 @router.get("")
 def stream_status():
     conn = get_db_connection()
@@ -186,6 +305,7 @@ def stream_status():
                     "camera_id": cid,
                     "name": r["camera_name"],
                     "active": camera_running.get(cid, False),
+                    "is_live_hardware": camera_instances.get(cid) is not None,
                 }
             )
         return {
@@ -230,9 +350,17 @@ def camera_stream_status(camera_id: str):
     str_id = str(camera_id)
     active = camera_running.get(str_id, False)
     frame_available = camera_frames.get(str_id) is not None
+    is_hardware = camera_instances.get(str_id) is not None
+    has_mobile_stream = (
+        str_id in mobile_uploaded_frames
+        and (time.time() - mobile_uploaded_frames[str_id]["timestamp"]) < 2.5
+    )
+
     return {
         "success": True,
         "camera_id": camera_id,
         "active": active,
         "frame_available": frame_available,
+        "is_hardware": is_hardware,
+        "has_mobile_stream": has_mobile_stream,
     }

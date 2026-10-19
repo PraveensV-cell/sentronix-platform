@@ -240,4 +240,18 @@ export const getExportCsvUrl = (reportType: string = "attendance") => {
     return `http://127.0.0.1:8000/reports/export/csv?report_type=${reportType}`;
 };
 
+export const getNetworkInfo = async () => {
+    const res = await API.get("/stream/network-info");
+    return res.data;
+};
+
+export const uploadCameraFrame = async (cameraId: number | string, blob: Blob) => {
+    const formData = new FormData();
+    formData.append("file", blob, "frame.jpg");
+    const res = await API.post(`/stream/${cameraId}/upload-frame`, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+    });
+    return res.data;
+};
+
 export default API;
