@@ -195,13 +195,12 @@ export default function EnvironmentSelectPage({ user, onEnvironmentSelected }) {
                             <div className="form-group">
                                 <label>Environment Type</label>
                                 <select value={newType} onChange={(e) => setNewType(e.target.value)}>
-                                    <option value="School">School</option>
-                                    <option value="College">College</option>
-                                    <option value="University">University</option>
-                                    <option value="Hospital">Hospital</option>
-                                    <option value="Industry">Industry / Factory</option>
-                                    <option value="Office">Corporate Office</option>
-                                    <option value="Custom">Custom Facility</option>
+                                    <option value="School">School / University Campus</option>
+                                    <option value="Military">Military Zone / Strategic Defense Base</option>
+                                    <option value="Industry">Heavy Industry / Factory Plant</option>
+                                    <option value="Hospital">Hospital / Healthcare Facility</option>
+                                    <option value="Corporate">Corporate Tech Park</option>
+                                    <option value="Custom">Custom Critical Infrastructure</option>
                                 </select>
                             </div>
                             <div className="form-group">

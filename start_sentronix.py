@@ -27,7 +27,7 @@ def main():
     subprocess.run([str(PYTHON_EXE), str(db_schema_script)], check=True)
 
     # 2. Launch FastAPI Backend
-    print("\n[2/3] Starting Sentronix Core API Backend on http://127.0.0.1:8000 ...")
+    print("\n[2/3] Starting Sentronix Core API Backend on http://0.0.0.0:8000 ...")
     env = os.environ.copy()
     env["PYTHONPATH"] = str(ML_PLATFORM_DIR)
 
@@ -37,10 +37,13 @@ def main():
             "-m",
             "uvicorn",
             "api.main:app",
+            "--app-dir",
+            str(ML_PLATFORM_DIR),
             "--host",
-            "127.0.0.1",
+            "0.0.0.0",
             "--port",
             "8000",
+            "--reload",
         ],
         cwd=str(ML_PLATFORM_DIR),
         env=env,
@@ -51,7 +54,14 @@ def main():
     # 3. Launch Vite Frontend
     print("\n[3/3] Starting React + Vite Command Center on http://localhost:5173 ...")
     frontend_proc = subprocess.Popen(
-        ["npm.cmd" if os.name == "nt" else "npm", "run", "dev"],
+        [
+            "npm.cmd" if os.name == "nt" else "npm",
+            "run",
+            "dev",
+            "--",
+            "--host",
+            "0.0.0.0",
+        ],
         cwd=str(DASHBOARD_DIR),
         shell=True,
     )

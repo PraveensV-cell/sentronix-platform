@@ -1,7 +1,5 @@
 import hashlib
-import random
 import sqlite3
-from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
 from fastapi import APIRouter, HTTPException
@@ -61,17 +59,12 @@ def register(req: RegisterRequest):
                 status_code=400, detail="Username, email or phone is already registered"
             )
 
-        # Generate 6-digit development OTP
-        mock_otp = f"{random.randint(100000, 999999)}"
-        expires_at = (datetime.now() + timedelta(minutes=15)).strftime(
-            "%Y-%m-%d %H:%M:%S"
-        )
-
         hashed_pw = hash_password(req.password)
-        conn.execute(
+        cursor = conn.cursor()
+        cursor.execute(
             """
-            INSERT INTO users (username, email, full_name, phone, hashed_password, role, is_verified, is_active, otp_code, otp_expires_at)
-            VALUES (?, ?, ?, ?, ?, ?, 0, 1, ?, ?)
+            INSERT INTO users (username, email, full_name, phone, hashed_password, role, is_verified, is_active)
+            VALUES (?, ?, ?, ?, ?, ?, 1, 1)
         """,
             (
                 req.username,
@@ -80,17 +73,30 @@ def register(req: RegisterRequest):
                 req.phone,
                 hashed_pw,
                 req.role or "operator",
-                mock_otp,
-                expires_at,
             ),
         )
+        user_id = cursor.lastrowid
         conn.commit()
+
+        token = (
+            f"sentronix_jwt_{user_id}_{hashlib.md5(req.username.encode()).hexdigest()}"
+        )
+        user_data = {
+            "id": user_id,
+            "username": req.username,
+            "full_name": req.full_name,
+            "email": req.email,
+            "role": req.role or "operator",
+            "is_verified": True,
+        }
 
         return {
             "success": True,
-            "message": "User registered. Please verify your account with OTP.",
-            "dev_mock_otp": mock_otp,
-            "instructions": f"[DEV MODE] Use OTP: {mock_otp} to verify your account instantly.",
+            "message": "User registered successfully.",
+            "access_token": token,
+            "token_type": "bearer",
+            "user": user_data,
+            "dev_mock_otp": "000000",
         }
     finally:
         conn.close()
@@ -98,40 +104,10 @@ def register(req: RegisterRequest):
 
 @router.post("/verify-otp")
 def verify_otp(req: VerifyOtpRequest):
-    conn = get_connection()
-    try:
-        lookup = req.email_or_phone or req.email
-        if not lookup:
-            raise HTTPException(status_code=400, detail="Email or phone is required")
-
-        user = conn.execute(
-            "SELECT * FROM users WHERE email = ? OR phone = ? OR username = ?",
-            (lookup, lookup, lookup),
-        ).fetchone()
-        if not user:
-            raise HTTPException(status_code=404, detail="User not found")
-
-        if user["is_verified"] == 1:
-            return {"success": True, "message": "Account is already verified."}
-
-        # Check OTP
-        if (
-            user["otp_code"] != req.otp and req.otp != "123456"
-        ):  # Fallback master dev OTP
-            raise HTTPException(status_code=400, detail="Invalid OTP code")
-
-        conn.execute(
-            "UPDATE users SET is_verified = 1, otp_code = NULL WHERE id = ?",
-            (user["id"],),
-        )
-        conn.commit()
-
-        return {
-            "success": True,
-            "message": "Account verified successfully. You may now login.",
-        }
-    finally:
-        conn.close()
+    return {
+        "success": True,
+        "message": "Account verified directly.",
+    }
 
 
 @router.post("/login")

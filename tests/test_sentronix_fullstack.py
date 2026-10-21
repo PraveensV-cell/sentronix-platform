@@ -84,7 +84,20 @@ class TestSentronixFullStack(unittest.TestCase):
         res = self.client.get("/cameras")
         self.assertEqual(res.status_code, 200)
         cameras = res.json()["cameras"]
-        self.assertGreaterEqual(len(cameras), 1)
+        self.assertGreaterEqual(len(cameras), 80)
+
+        # Test function catalog
+        func_res = self.client.get("/cameras/functions/list")
+        self.assertEqual(func_res.status_code, 200)
+        self.assertGreaterEqual(len(func_res.json()["functions"]), 7)
+
+        # Test function assignment
+        patch_func = self.client.patch(
+            "/cameras/1/function",
+            json={"assigned_function": "PERIMETER_INTRUSION"},
+        )
+        self.assertEqual(patch_func.status_code, 200)
+        self.assertEqual(patch_func.json()["assigned_function"], "PERIMETER_INTRUSION")
 
     def test_05_people_and_face_enrollment(self):
         import uuid

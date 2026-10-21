@@ -1,11 +1,11 @@
 import { useState } from "react";
-import { loginUser, registerUser, verifyOtp } from "../api/api";
+import { loginUser, registerUser } from "../api/api";
 
 export default function AuthPage({ onAuthenticated }) {
-    const [mode, setMode] = useState("login"); // 'login' | 'register' | 'otp'
+    const [mode, setMode] = useState("login"); // 'login' | 'register'
     const [usernameOrEmail, setUsernameOrEmail] = useState("");
     const [password, setPassword] = useState("");
-    
+
     // Register fields
     const [regUsername, setRegUsername] = useState("");
     const [regEmail, setRegEmail] = useState("");
@@ -13,11 +13,6 @@ export default function AuthPage({ onAuthenticated }) {
     const [regPhone, setRegPhone] = useState("");
     const [regPassword, setRegPassword] = useState("");
     const [regRole, setRegRole] = useState("operator");
-
-    // OTP verification fields
-    const [otpEmail, setOtpEmail] = useState("");
-    const [otpCode, setOtpCode] = useState("");
-    const [mockOtpHint, setMockOtpHint] = useState("");
 
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
@@ -61,36 +56,18 @@ export default function AuthPage({ onAuthenticated }) {
                 role: regRole,
             });
 
-            if (res.success) {
-                setOtpEmail(regEmail);
-                setMockOtpHint(res.dev_mock_otp);
-                setOtpCode(res.dev_mock_otp); // auto-fill in dev mode for ease!
-                setMode("otp");
+            if (res.success && res.access_token) {
+                localStorage.setItem("sentronix_token", res.access_token);
+                localStorage.setItem("sentronix_user", JSON.stringify(res.user));
+                onAuthenticated(res.user);
+            } else if (res.success) {
+                // If token wasn't returned, log in directly
+                await handleLogin(null, regUsername, regPassword);
             } else {
                 setError(res.detail || "Registration failed");
             }
         } catch (err) {
-            setError(err.response?.data?.detail || "Registration failed");
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleVerifyOtp = async (e) => {
-        e.preventDefault();
-        setError("");
-        setLoading(true);
-
-        try {
-            const res = await verifyOtp({ email: otpEmail, otp: otpCode });
-            if (res.success) {
-                // Auto-login with the newly verified credentials
-                await handleLogin(null, regUsername, regPassword);
-            } else {
-                setError(res.detail || "OTP verification failed");
-            }
-        } catch (err) {
-            setError(err.response?.data?.detail || "Invalid OTP code");
+            setError(err.response?.data?.detail || "Registration failed. Username or email may already be taken.");
         } finally {
             setLoading(false);
         }
@@ -107,12 +84,30 @@ export default function AuthPage({ onAuthenticated }) {
                     <p>Intelligent Surveillance & Safety Operations Platform</p>
                 </div>
 
+                {/* Mode Selector Tabs */}
+                <div className="auth-tabs-row">
+                    <button
+                        type="button"
+                        className={`auth-tab-btn ${mode === "login" ? "active" : ""}`}
+                        onClick={() => { setMode("login"); setError(""); }}
+                    >
+                        Sign In
+                    </button>
+                    <button
+                        type="button"
+                        className={`auth-tab-btn ${mode === "register" ? "active" : ""}`}
+                        onClick={() => { setMode("register"); setError(""); }}
+                    >
+                        Create Account
+                    </button>
+                </div>
+
                 {error && <div className="auth-alert error">{error}</div>}
 
                 {mode === "login" && (
                     <form onSubmit={handleLogin} className="auth-form">
                         <div className="form-group">
-                            <label>User ID, Phone Number, or Email Address</label>
+                            <label>User ID, Phone Number, or Email</label>
                             <input
                                 type="text"
                                 placeholder="e.g. admin, +1 555-0199, or operator@school.edu"
@@ -163,7 +158,7 @@ export default function AuthPage({ onAuthenticated }) {
 
                         <div className="auth-footer-toggle">
                             Don't have an account?{" "}
-                            <button type="button" onClick={() => setMode("register")}>
+                            <button type="button" onClick={() => { setMode("register"); setError(""); }}>
                                 Register here
                             </button>
                         </div>
@@ -174,10 +169,10 @@ export default function AuthPage({ onAuthenticated }) {
                     <form onSubmit={handleRegister} className="auth-form">
                         <div className="form-row">
                             <div className="form-group">
-                                <label>Username</label>
+                                <label>Username / User ID</label>
                                 <input
                                     type="text"
-                                    placeholder="johndoe"
+                                    placeholder="e.g. guard_01"
                                     value={regUsername}
                                     onChange={(e) => setRegUsername(e.target.value)}
                                     required
@@ -187,7 +182,7 @@ export default function AuthPage({ onAuthenticated }) {
                                 <label>Full Name</label>
                                 <input
                                     type="text"
-                                    placeholder="John Doe"
+                                    placeholder="e.g. Security Officer"
                                     value={regFullName}
                                     onChange={(e) => setRegFullName(e.target.value)}
                                     required
@@ -200,17 +195,17 @@ export default function AuthPage({ onAuthenticated }) {
                                 <label>Email Address</label>
                                 <input
                                     type="email"
-                                    placeholder="john@school.edu"
+                                    placeholder="officer@sentronix.ai"
                                     value={regEmail}
                                     onChange={(e) => setRegEmail(e.target.value)}
                                     required
                                 />
                             </div>
                             <div className="form-group">
-                                <label>Phone</label>
+                                <label>Phone Number (Optional)</label>
                                 <input
                                     type="text"
-                                    placeholder="+1 555-0199"
+                                    placeholder="+91 98765 43210"
                                     value={regPhone}
                                     onChange={(e) => setRegPhone(e.target.value)}
                                 />
@@ -219,15 +214,15 @@ export default function AuthPage({ onAuthenticated }) {
 
                         <div className="form-row">
                             <div className="form-group">
-                                <label>Role</label>
+                                <label>Operational Role</label>
                                 <select
                                     value={regRole}
                                     onChange={(e) => setRegRole(e.target.value)}
                                 >
                                     <option value="operator">Security Operator</option>
-                                    <option value="admin">Administrator</option>
-                                    <option value="analyst">Analyst</option>
-                                    <option value="viewer">Viewer</option>
+                                    <option value="admin">System Administrator</option>
+                                    <option value="analyst">Safety Analyst</option>
+                                    <option value="viewer">Command Room Viewer</option>
                                 </select>
                             </div>
                             <div className="form-group">
@@ -243,45 +238,13 @@ export default function AuthPage({ onAuthenticated }) {
                         </div>
 
                         <button type="submit" className="auth-submit-btn" disabled={loading}>
-                            {loading ? "Registering..." : "Send Verification OTP"}
+                            {loading ? "Registering & Signing In..." : "Complete Registration & Enter"}
                         </button>
 
                         <div className="auth-footer-toggle">
                             Already registered?{" "}
-                            <button type="button" onClick={() => setMode("login")}>
+                            <button type="button" onClick={() => { setMode("login"); setError(""); }}>
                                 Sign in
-                            </button>
-                        </div>
-                    </form>
-                )}
-
-                {mode === "otp" && (
-                    <form onSubmit={handleVerifyOtp} className="auth-form">
-                        <div className="auth-otp-badge">
-                            <strong>[DEV OTP MODE ACTIVE]</strong>
-                            <p>Verification OTP generated for {otpEmail}:</p>
-                            <span className="otp-highlight">{mockOtpHint}</span>
-                        </div>
-
-                        <div className="form-group">
-                            <label>Enter 6-Digit OTP</label>
-                            <input
-                                type="text"
-                                placeholder="123456"
-                                value={otpCode}
-                                onChange={(e) => setOtpCode(e.target.value)}
-                                maxLength={6}
-                                required
-                            />
-                        </div>
-
-                        <button type="submit" className="auth-submit-btn" disabled={loading}>
-                            {loading ? "Verifying..." : "Verify & Launch System"}
-                        </button>
-
-                        <div className="auth-footer-toggle">
-                            <button type="button" onClick={() => setMode("register")}>
-                                Back to registration
                             </button>
                         </div>
                     </form>

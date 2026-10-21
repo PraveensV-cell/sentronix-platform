@@ -15,12 +15,13 @@ export default function LiveSurveillanceView({ environment, systemOnline }) {
     const [alerts, setAlerts] = useState([]);
     const [isStreaming, setIsStreaming] = useState(true);
     const [viewMode, setViewMode] = useState("focus"); // "focus" | "multi_grid"
+    const [surveillanceSector, setSurveillanceSector] = useState("all");
     const [snapshotMsg, setSnapshotMsg] = useState("");
 
     const loadData = async () => {
         try {
             const [camRes, detRes, altRes] = await Promise.all([
-                getCameras(),
+                getCameras({ limit: 120 }),
                 getDetections(),
                 getAlerts(),
             ]);
@@ -134,29 +135,50 @@ export default function LiveSurveillanceView({ environment, systemOnline }) {
                 <div className="mode-bar-left">
                     <span className="mode-bar-title">OPERATIONAL SURVEILLANCE DISPLAY</span>
                     <span className="mode-bar-sub">
-                        Concurrent feeds: Laptop Webcam, Mobile Phone IP, CCTV RTSP, USB Camera
+                        80 Cameras Multi-Sector Fleet • Active Model: YOLOv11s + FaceNet Pipeline
                     </span>
                 </div>
-                <div className="mode-switcher-pills">
-                    <button
-                        className={`mode-pill ${viewMode === "focus" ? "active" : ""}`}
-                        onClick={() => setViewMode("focus")}
-                    >
-                        ◻ Single Focus View
-                    </button>
-                    <button
-                        className={`mode-pill ${viewMode === "multi_grid" ? "active" : ""}`}
-                        onClick={() => setViewMode("multi_grid")}
-                    >
-                        ⊞ Multi-Camera Quad Matrix ({cameras.length} Feeds Live)
-                    </button>
+                <div className="mode-controls-right">
+                    <div className="sector-filter-dropdown-wrap">
+                        <select
+                            value={surveillanceSector}
+                            onChange={(e) => setSurveillanceSector(e.target.value)}
+                            className="sector-select-box"
+                        >
+                            <option value="all">🌐 All Sectors (80 Cameras)</option>
+                            <option value={1}>🛡️ Sector 1: Perimeter Fences</option>
+                            <option value={2}>🚪 Sector 2: Main Gates & Turnstiles</option>
+                            <option value={3}>🏢 Sector 3: Corridors & Walkways</option>
+                            <option value={4}>🔒 Sector 4: Vaults & Laboratories</option>
+                            <option value={5}>🏭 Sector 5: Operational Plants</option>
+                            <option value={6}>🏛️ Sector 6: Public Plazas</option>
+                            <option value={7}>🚗 Sector 7: Logistics & Parking</option>
+                        </select>
+                    </div>
+                    <div className="mode-switcher-pills">
+                        <button
+                            className={`mode-pill ${viewMode === "focus" ? "active" : ""}`}
+                            onClick={() => setViewMode("focus")}
+                        >
+                            ◻ Single Focus View
+                        </button>
+                        <button
+                            className={`mode-pill ${viewMode === "multi_grid" ? "active" : ""}`}
+                            onClick={() => setViewMode("multi_grid")}
+                        >
+                            ⊞ Multi-Camera Quad Matrix
+                        </button>
+                    </div>
                 </div>
             </div>
 
             {/* Multi-Camera Matrix (Simultaneous Multi-Screen Grid) */}
             {viewMode === "multi_grid" ? (
                 <div className="multi-camera-matrix">
-                    {cameras.map((c) => {
+                    {(surveillanceSector === "all"
+                        ? cameras.slice(0, 12)
+                        : cameras.filter((c) => Number(c.group_id) === Number(surveillanceSector))
+                    ).map((c) => {
                         const isOnline = String(c.status).toLowerCase() === "online";
                         const isSelected = selectedCamera?.id === c.id;
                         return (
@@ -173,7 +195,9 @@ export default function LiveSurveillanceView({ environment, systemOnline }) {
                                     </div>
                                     <div className="matrix-badge-group">
                                         <span className="source-pill">
-                                            {c.source_type || "webcam"}
+                                            {c.assigned_function
+                                                ? c.assigned_function.replace("_", " ")
+                                                : "FACE ATTENDANCE"}
                                         </span>
                                         <button
                                             className="btn-focus-quick"
@@ -195,7 +219,7 @@ export default function LiveSurveillanceView({ environment, systemOnline }) {
                                     />
                                     <div className="matrix-hud-strip">
                                         <span className="matrix-loc">
-                                            📍 {c.location || "Security Zone"}
+                                            📍 {c.location || "Security Zone"} • Sector {c.group_id}
                                         </span>
                                         <span className="matrix-fps">HD 720p • 25 FPS</span>
                                     </div>
@@ -211,9 +235,16 @@ export default function LiveSurveillanceView({ environment, systemOnline }) {
                     <div className="video-player-container">
                         <div className="player-header">
                             <div className="camera-meta">
-                                <h3>{selectedCamera?.camera_name || "Camera 01"}</h3>
+                                <div className="player-title-row">
+                                    <h3>{selectedCamera?.camera_name || "Camera 01"}</h3>
+                                    <span className="player-func-badge">
+                                        🎯 {selectedCamera?.assigned_function
+                                            ? selectedCamera.assigned_function.replace("_", " ")
+                                            : "FACE ATTENDANCE"}
+                                    </span>
+                                </div>
                                 <span className="camera-loc">
-                                    📍 {selectedCamera?.location || "Main Entrance"}
+                                    📍 {selectedCamera?.location || "Main Entrance"} • Sector {selectedCamera?.group_id || 1}
                                 </span>
                             </div>
                             <div className="stream-badge-row">
@@ -267,11 +298,14 @@ export default function LiveSurveillanceView({ environment, systemOnline }) {
                     <div className="camera-sidebar-list">
                         <div className="panel-title-bar">
                             <h4>Camera Devices ({cameras.length})</h4>
-                            <span>Group: All</span>
+                            <span>Sector: {surveillanceSector === "all" ? "All" : surveillanceSector}</span>
                         </div>
 
                         <div className="camera-card-stack">
-                            {cameras.map((c) => {
+                            {(surveillanceSector === "all"
+                                ? cameras
+                                : cameras.filter((c) => Number(c.group_id) === Number(surveillanceSector))
+                            ).map((c) => {
                                 const isSelected = selectedCamera?.id === c.id;
                                 const isOnline =
                                     String(c.status).toLowerCase() === "online";
@@ -291,6 +325,9 @@ export default function LiveSurveillanceView({ environment, systemOnline }) {
                                             <span className="item-type">
                                                 {c.source_type || "USB"}
                                             </span>
+                                        </div>
+                                        <div className="item-func-sub">
+                                            🎯 {c.assigned_function ? c.assigned_function.replace("_", " ") : "FACE ATTENDANCE"}
                                         </div>
                                         <span className="item-location">
                                             {c.location || "Facility Area"}

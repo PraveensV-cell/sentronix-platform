@@ -75,6 +75,7 @@ def get_camera_source_info(camera_id: str):
             "source_type": "webcam",
             "source_url": "0",
             "status": "online",
+            "assigned_function": "FACE_ATTENDANCE",
         }
     finally:
         conn.close()
@@ -194,8 +195,9 @@ def camera_worker(camera_id: str):
         if raw_frame is None:
             raw_frame = generate_synthetic_frame(frame_counter, cam_name, db_id)
 
-        # Run multi-stage AI perception (YOLOv11s, Face Detection, Attendance, Alerts)
-        processed = process_frame(raw_frame, cam_name, db_id)
+        # Run multi-stage AI perception (YOLOv11s, Face Detection, Attendance, Alerts) based on assigned function
+        assigned_func = info.get("assigned_function", "FACE_ATTENDANCE")
+        processed = process_frame(raw_frame, cam_name, db_id, assigned_func)
 
         lock = camera_locks.get(str_id)
         if lock is not None:

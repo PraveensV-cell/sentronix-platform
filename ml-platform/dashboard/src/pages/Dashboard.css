@@ -1922,6 +1922,40 @@ input:checked + .slider:before {
     margin: 6px 0 0;
 }
 
+.auth-tabs-row {
+    display: flex;
+    background: #040c17;
+    border: 1px solid #14283c;
+    border-radius: 8px;
+    padding: 4px;
+    margin-bottom: 20px;
+    gap: 6px;
+}
+
+.auth-tab-btn {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: #71859c;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 8px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.auth-tab-btn:hover {
+    color: #ffffff;
+}
+
+.auth-tab-btn.active {
+    background: #00E5FF;
+    color: #030811;
+    font-weight: 800;
+    box-shadow: 0 0 10px rgba(0, 229, 255, 0.35);
+}
+
 .auth-alert.error {
     background: rgba(255, 51, 102, 0.15);
     border: 1px solid #FF3366;
@@ -3511,5 +3545,297 @@ input:checked + .slider:before {
     color: #25d98a;
     font-weight: 700;
 }
+
+/* 80 Cameras Fleet & Sector Filter Styling */
+.mode-controls-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.sector-select-box {
+    background: #040c17;
+    border: 1px solid #14283c;
+    color: #00E5FF;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 8px 14px;
+    border-radius: 8px;
+    outline: none;
+    cursor: pointer;
+}
+
+.player-title-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 2px;
+}
+
+.player-func-badge {
+    background: rgba(0, 229, 255, 0.15);
+    border: 1px solid rgba(0, 229, 255, 0.4);
+    color: #00E5FF;
+    font-size: 11px;
+    font-weight: 800;
+    padding: 2px 8px;
+    border-radius: 4px;
+    letter-spacing: 0.5px;
+}
+
+.item-func-sub {
+    font-size: 11px;
+    font-weight: 700;
+    color: #00E5FF;
+    margin: 3px 0 5px;
+}
+
+.fleet-filter-card {
+    background: #091626;
+    border: 1px solid #162a3f;
+    border-radius: 12px;
+    padding: 14px 18px;
+    margin-bottom: 16px;
+}
+
+.filter-row-header {
+    display: flex;
+    align-items: center;
+    font-size: 12px;
+    font-weight: 800;
+    color: #71859c;
+    letter-spacing: 0.8px;
+    margin-bottom: 10px;
+}
+
+.filter-row-header.space-between {
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.fleet-search-input {
+    background: #040c17;
+    border: 1px solid #14283c;
+    color: #ffffff;
+    font-size: 12px;
+    padding: 6px 14px;
+    border-radius: 6px;
+    width: 280px;
+    outline: none;
+}
+
+.fleet-search-input:focus {
+    border-color: #00E5FF;
+}
+
+.filter-pills-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.filter-pill-btn {
+    background: #040c17;
+    border: 1px solid #14283c;
+    color: #8da4be;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.filter-pill-btn:hover {
+    color: #ffffff;
+    border-color: #1f3b5c;
+}
+
+.filter-pill-btn.active {
+    background: #00E5FF;
+    color: #030811;
+    border-color: #00E5FF;
+    font-weight: 800;
+    box-shadow: 0 0 10px rgba(0, 229, 255, 0.3);
+}
+
+.assigned-func-banner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(0, 229, 255, 0.08);
+    border: 1px solid rgba(0, 229, 255, 0.2);
+    border-radius: 6px;
+    padding: 8px 10px;
+    margin: 8px 0 12px;
+}
+
+.func-icon {
+    font-size: 18px;
+}
+
+.func-text {
+    display: flex;
+    flex-direction: column;
+}
+
+.func-tag-label {
+    font-size: 9px;
+    font-weight: 800;
+    color: #71859c;
+    letter-spacing: 0.5px;
+}
+
+.func-text strong {
+    font-size: 12px;
+    color: #00E5FF;
+}
+
+.camera-card-footer-buttons {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid #14283c;
+}
+
+.btn-action-pill {
+    padding: 6px 8px;
+    font-size: 11px;
+    font-weight: 700;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    text-align: center;
+    text-decoration: none;
+    transition: all 0.2s;
+}
+
+.btn-action-pill.func-btn {
+    background: rgba(0, 229, 255, 0.12);
+    color: #00E5FF;
+    border: 1px solid rgba(0, 229, 255, 0.35);
+}
+
+.btn-action-pill.func-btn:hover {
+    background: #00E5FF;
+    color: #030811;
+}
+
+.btn-action-pill.source-btn {
+    background: #14283c;
+    color: #d1e2f2;
+    border: 1px solid #1d3c5a;
+}
+
+.btn-action-pill.source-btn:hover {
+    background: #1d3c5a;
+    color: #ffffff;
+}
+
+.btn-action-pill.ai-on {
+    background: rgba(37, 217, 138, 0.15);
+    color: #25d98a;
+    border: 1px solid rgba(37, 217, 138, 0.4);
+}
+
+.btn-action-pill.ai-off {
+    background: rgba(113, 133, 156, 0.15);
+    color: #71859c;
+    border: 1px solid #1b2f44;
+}
+
+.btn-action-pill.view-btn {
+    background: #040c17;
+    color: #71859c;
+    border: 1px solid #14283c;
+}
+
+.btn-action-pill.view-btn:hover {
+    color: #00E5FF;
+    border-color: #00E5FF;
+}
+
+/* Function Picker Grid Modal */
+.function-assign-modal {
+    max-width: 680px;
+}
+
+.function-picker-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin: 16px 0;
+    max-height: 420px;
+    overflow-y: auto;
+}
+
+.func-option-card {
+    background: #040c17;
+    border: 1px solid #14283c;
+    border-radius: 8px;
+    padding: 12px 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.func-option-card:hover {
+    border-color: #00E5FF;
+}
+
+.func-option-card.selected {
+    border-color: #00E5FF;
+    background: rgba(0, 229, 255, 0.08);
+    box-shadow: 0 0 10px rgba(0, 229, 255, 0.2);
+}
+
+.func-opt-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+    font-size: 13px;
+    color: #ffffff;
+}
+
+.opt-icon {
+    font-size: 16px;
+}
+
+.func-option-card p {
+    margin: 0;
+    font-size: 11px;
+    color: #71859c;
+    line-height: 1.4;
+}
+
+.quick-source-buttons {
+    background: #040c17;
+    border: 1px solid #14283c;
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 14px;
+}
+
+.quick-source-buttons span {
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    color: #71859c;
+    margin-bottom: 8px;
+}
+
+.preset-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
 
 

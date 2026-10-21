@@ -51,8 +51,13 @@ export interface Environment {
 
 export interface Camera {
     id: number;
+    environment_id?: number;
+    group_id?: number;
+    group_name?: string;
     camera_name: string;
     location: string;
+    zone?: string;
+    assigned_function?: string;
     status: string;
     source_type?: string;
     source_url?: string;
@@ -153,13 +158,36 @@ export const updateEnvironmentFeatures = async (envId: number, features: string[
     return res.data;
 };
 
-export const getCameras = async () => {
-    const res = await API.get("/cameras");
+export const getCameras = async (params: any = {}) => {
+    const res = await API.get("/cameras", { params });
     return res.data;
 };
 
 export const createCamera = async (data: any) => {
-    const res = await API.post("/cameras", null, { params: data });
+    const res = await API.post("/cameras", data);
+    return res.data;
+};
+
+export const assignCameraFunction = async (cameraId: number | string, assigned_function: string) => {
+    const res = await API.patch(`/cameras/${cameraId}/function`, { assigned_function });
+    return res.data;
+};
+
+export const assignCameraSource = async (
+    cameraId: number | string,
+    data: { source_type: string; source_url: string; location?: string; zone?: string }
+) => {
+    const res = await API.patch(`/cameras/${cameraId}/source`, data);
+    return res.data;
+};
+
+export const toggleCameraAi = async (cameraId: number | string) => {
+    const res = await API.patch(`/cameras/${cameraId}/toggle-ai`);
+    return res.data;
+};
+
+export const getCameraFunctions = async () => {
+    const res = await API.get("/cameras/functions/list");
     return res.data;
 };
 

@@ -1,464 +1,338 @@
 import sqlite3
-from datetime import datetime
 from pathlib import Path
-
-from fastapi import APIRouter
+from typing import Optional
+from fastapi import APIRouter, HTTPException, Query
+from pydantic import BaseModel
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-
 DATABASE_PATH = BASE_DIR / "database" / "sentronix.db"
 
 router = APIRouter(
     prefix="/cameras",
-    tags=["Cameras"],
+    tags=["Cameras Fleet"],
 )
 
 
 def get_connection():
-    DATABASE_PATH.parent.mkdir(
-        parents=True,
-        exist_ok=True,
-    )
-
+    DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
     connection = sqlite3.connect(str(DATABASE_PATH))
-
     connection.row_factory = sqlite3.Row
-
     return connection
 
 
-def get_columns(
-    connection,
-):
-    rows = connection.execute("PRAGMA table_info(cameras)").fetchall()
-
-    return [row["name"] for row in rows]
-
-
-def ensure_table(
-    connection,
-):
-    connection.execute(
-        """
-        CREATE TABLE IF NOT EXISTS cameras (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            camera_id TEXT UNIQUE,
-            name TEXT,
-            source TEXT,
-            camera_type TEXT,
-            status TEXT,
-            created_at TEXT,
-            updated_at TEXT
-        )
-        """
-    )
-
-    connection.commit()
+class CreateCameraRequest(BaseModel):
+    name: str
+    location: Optional[str] = "Main Facility"
+    zone: Optional[str] = "General"
+    source_type: Optional[str] = "webcam"
+    source_url: Optional[str] = "0"
+    assigned_function: Optional[str] = "FACE_ATTENDANCE"
+    group_id: Optional[int] = 1
+    environment_id: Optional[int] = 1
 
 
-def row_to_dict(
-    row,
-):
-    if row is None:
-        return None
+class UpdateFunctionRequest(BaseModel):
+    assigned_function: str
 
-    return dict(row)
+
+class UpdateSourceRequest(BaseModel):
+    source_type: str
+    source_url: str
+    location: Optional[str] = None
+    zone: Optional[str] = None
+
+
+CAMERA_FUNCTIONS = [
+    {
+        "id": "FACE_ATTENDANCE",
+        "label": "Face Recognition & Automated Attendance",
+        "icon": "🎓",
+        "description": "Localizes human faces, performs neural identity matching against registry, and logs student/staff attendance check-ins.",
+    },
+    {
+        "id": "PERIMETER_INTRUSION",
+        "label": "Perimeter Intrusion & Tripwire Detection",
+        "icon": "⛔",
+        "description": "Monitors restricted outer fences and sterile corridors; triggers immediate critical intrusion alarms if personnel enter.",
+    },
+    {
+        "id": "DRESS_CODE_PPE",
+        "label": "Dress-Code, Uniform & PPE Compliance",
+        "icon": "👔",
+        "description": "Enforces dress code policies, hardhat/vest compliance in industrial blocks, and lab coat wear in research environments.",
+    },
+    {
+        "id": "FIRE_SMOKE_HAZARD",
+        "label": "Fire, Smoke & Thermal Hazard Alert",
+        "icon": "🔥",
+        "description": "Detects real-time fire outbreaks, smoke accumulation, or chemical vat leakage using multi-spectral computer vision.",
+    },
+    {
+        "id": "CROWD_LOITERING",
+        "label": "Crowd Density & Loitering Prevention",
+        "icon": "👥",
+        "description": "Monitors hallway bottlenecks, public concourses, and loitering stagnation beyond configurable dwell thresholds.",
+    },
+    {
+        "id": "WEAPON_VIOLENCE",
+        "label": "Weapon Detection & Violence Alert",
+        "icon": "🚨",
+        "description": "Real-time identification of brandished weapons, knives, physical altercations, or violent aggression.",
+    },
+    {
+        "id": "ANPR_VEHICLES",
+        "label": "Vehicle Access & ANPR License Plate",
+        "icon": "🚗",
+        "description": "Monitors ingress/egress boom barriers, weighs stations, and enforces authorized parking lot allocation.",
+    },
+]
+
+
+@router.get("/functions/list")
+def get_camera_functions_catalog():
+    """Returns standard operational functions assignable to cameras."""
+    return {
+        "success": True,
+        "functions": CAMERA_FUNCTIONS,
+    }
 
 
 @router.get("")
-def get_cameras():
-    connection = get_connection()
-
+def get_cameras(
+    environment_id: Optional[int] = None,
+    group_id: Optional[int] = None,
+    assigned_function: Optional[str] = None,
+    search: Optional[str] = None,
+    limit: int = Query(100, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+):
+    """Returns the fleet of cameras with filtering by sector/group, function, or name."""
+    conn = get_connection()
     try:
-        ensure_table(connection)
+        query = """
+            SELECT 
+                c.id,
+                c.environment_id,
+                c.group_id,
+                c.camera_name,
+                c.source_type,
+                c.source_url,
+                c.location,
+                c.zone,
+                COALESCE(c.assigned_function, 'FACE_ATTENDANCE') AS assigned_function,
+                c.status,
+                c.ai_enabled,
+                c.processing_fps,
+                c.created_at,
+                g.name AS group_name
+            FROM cameras c
+            LEFT JOIN camera_groups g ON c.group_id = g.id
+            WHERE 1=1
+        """
+        params = []
 
-        rows = connection.execute(
-            """
-            SELECT *
-            FROM cameras
-            ORDER BY id ASC
-            """
-        ).fetchall()
+        if environment_id is not None:
+            query += " AND c.environment_id = ?"
+            params.append(environment_id)
 
-        cameras = [row_to_dict(row) for row in rows]
+        if group_id is not None:
+            query += " AND c.group_id = ?"
+            params.append(group_id)
+
+        if assigned_function:
+            query += " AND UPPER(c.assigned_function) = ?"
+            params.append(assigned_function.upper())
+
+        if search:
+            query += " AND (c.camera_name LIKE ? OR c.location LIKE ? OR c.zone LIKE ?)"
+            term = f"%{search}%"
+            params.extend([term, term, term])
+
+        query += " ORDER BY c.id ASC LIMIT ? OFFSET ?"
+        params.extend([limit, offset])
+
+        rows = conn.execute(query, params).fetchall()
+        cameras = [dict(r) for r in rows]
+
+        # Total count
+        count_query = "SELECT COUNT(*) FROM cameras WHERE 1=1"
+        count_params = []
+        if environment_id is not None:
+            count_query += " AND environment_id = ?"
+            count_params.append(environment_id)
+        if group_id is not None:
+            count_query += " AND group_id = ?"
+            count_params.append(group_id)
+        if assigned_function:
+            count_query += " AND UPPER(assigned_function) = ?"
+            count_params.append(assigned_function.upper())
+
+        total = conn.execute(count_query, count_params).fetchone()[0]
 
         return {
             "count": len(cameras),
+            "total": total,
             "cameras": cameras,
         }
-
     finally:
-        connection.close()
+        conn.close()
 
 
 @router.get("/{camera_id}")
-def get_camera(
-    camera_id: str,
-):
-    connection = get_connection()
-
+def get_camera(camera_id: int):
+    conn = get_connection()
     try:
-        ensure_table(connection)
+        row = conn.execute(
+            """
+            SELECT 
+                c.*,
+                g.name AS group_name
+            FROM cameras c
+            LEFT JOIN camera_groups g ON c.group_id = g.id
+            WHERE c.id = ?
+        """,
+            (camera_id,),
+        ).fetchone()
 
-        columns = get_columns(connection)
-
-        if "camera_id" in columns:
-            row = connection.execute(
-                """
-                SELECT *
-                FROM cameras
-                WHERE camera_id = ?
-                """,
-                (camera_id,),
-            ).fetchone()
-        else:
-            try:
-                row = connection.execute(
-                    """
-                    SELECT *
-                    FROM cameras
-                    WHERE id = ?
-                    """,
-                    (int(camera_id),),
-                ).fetchone()
-            except ValueError:
-                row = None
-
-        if row is None:
-            return {
-                "success": False,
-                "message": "Camera not found",
-            }
+        if not row:
+            raise HTTPException(status_code=404, detail="Camera not found")
 
         return {
             "success": True,
-            "camera": row_to_dict(row),
+            "camera": dict(row),
         }
-
     finally:
-        connection.close()
+        conn.close()
 
 
 @router.post("")
-def create_camera(
-    camera_id: str,
-    name: str,
-    source: str,
-    camera_type: str = "USB",
-):
-    connection = get_connection()
-
+def create_camera(req: CreateCameraRequest):
+    """Registers a new surveillance camera in the fleet."""
+    conn = get_connection()
     try:
-        ensure_table(connection)
-
-        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-        existing = connection.execute(
-            """
-            SELECT *
-            FROM cameras
-            WHERE camera_id = ?
-            """,
-            (camera_id,),
-        ).fetchone()
-
-        if existing is not None:
-            return {
-                "success": False,
-                "message": "Camera already exists",
-                "camera": row_to_dict(existing),
-            }
-
-        connection.execute(
+        cursor = conn.cursor()
+        cursor.execute(
             """
             INSERT INTO cameras (
-                camera_id,
-                name,
-                source,
-                camera_type,
-                status,
-                created_at,
-                updated_at
+                environment_id, group_id, camera_name, source_type, source_url, location, zone, assigned_function, status, ai_enabled
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-            """,
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'online', 1)
+        """,
             (
-                camera_id,
-                name,
-                source,
-                camera_type,
-                "OFFLINE",
-                now,
-                now,
+                req.environment_id or 1,
+                req.group_id or 1,
+                req.name,
+                req.source_type or "webcam",
+                req.source_url or "0",
+                req.location or "Facility Area",
+                req.zone or "General",
+                req.assigned_function or "FACE_ATTENDANCE",
             ),
         )
+        cam_id = cursor.lastrowid
+        conn.commit()
 
-        connection.commit()
-
-        row = connection.execute(
-            """
-            SELECT *
-            FROM cameras
-            WHERE camera_id = ?
-            """,
-            (camera_id,),
-        ).fetchone()
-
+        row = conn.execute("SELECT * FROM cameras WHERE id = ?", (cam_id,)).fetchone()
         return {
             "success": True,
-            "message": "Camera created",
-            "camera": row_to_dict(row),
+            "message": "Camera registered successfully",
+            "camera": dict(row),
         }
-
     finally:
-        connection.close()
+        conn.close()
 
 
-@router.put("/{camera_id}")
-def update_camera(
-    camera_id: str,
-    name: str,
-    source: str,
-    camera_type: str = "USB",
-):
-    connection = get_connection()
-
-    try:
-        ensure_table(connection)
-
-        existing = connection.execute(
-            """
-            SELECT *
-            FROM cameras
-            WHERE camera_id = ?
-            """,
-            (camera_id,),
-        ).fetchone()
-
-        if existing is None:
-            return {
-                "success": False,
-                "message": "Camera not found",
-            }
-
-        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-        connection.execute(
-            """
-            UPDATE cameras
-            SET
-                name = ?,
-                source = ?,
-                camera_type = ?,
-                updated_at = ?
-            WHERE camera_id = ?
-            """,
-            (
-                name,
-                source,
-                camera_type,
-                now,
-                camera_id,
-            ),
+@router.patch("/{camera_id}/function")
+def assign_camera_function(camera_id: int, req: UpdateFunctionRequest):
+    """Assigns an operational AI function to a specific camera."""
+    valid_ids = [f["id"] for f in CAMERA_FUNCTIONS]
+    func_upper = req.assigned_function.upper()
+    if func_upper not in valid_ids:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid function. Must be one of: {', '.join(valid_ids)}",
         )
 
-        connection.commit()
-
-        row = connection.execute(
-            """
-            SELECT *
-            FROM cameras
-            WHERE camera_id = ?
-            """,
-            (camera_id,),
-        ).fetchone()
-
-        return {
-            "success": True,
-            "message": "Camera updated",
-            "camera": row_to_dict(row),
-        }
-
-    finally:
-        connection.close()
-
-
-@router.patch("/{camera_id}/status")
-def update_camera_status(
-    camera_id: str,
-    status: str,
-):
-    allowed_statuses = {
-        "ONLINE",
-        "OFFLINE",
-        "CONNECTING",
-        "ERROR",
-        "DISABLED",
-    }
-
-    status = status.upper()
-
-    if status not in allowed_statuses:
-        return {
-            "success": False,
-            "message": "Invalid camera status",
-            "allowed": sorted(allowed_statuses),
-        }
-
-    connection = get_connection()
-
+    conn = get_connection()
     try:
-        ensure_table(connection)
-
-        existing = connection.execute(
-            """
-            SELECT *
-            FROM cameras
-            WHERE camera_id = ?
-            """,
-            (camera_id,),
+        cam = conn.execute(
+            "SELECT id FROM cameras WHERE id = ?", (camera_id,)
         ).fetchone()
+        if not cam:
+            raise HTTPException(status_code=404, detail="Camera not found")
 
-        if existing is None:
-            return {
-                "success": False,
-                "message": "Camera not found",
-            }
-
-        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-        connection.execute(
-            """
-            UPDATE cameras
-            SET
-                status = ?,
-                updated_at = ?
-            WHERE camera_id = ?
-            """,
-            (
-                status,
-                now,
-                camera_id,
-            ),
+        conn.execute(
+            "UPDATE cameras SET assigned_function = ? WHERE id = ?",
+            (func_upper, camera_id),
         )
-
-        connection.commit()
-
-        row = connection.execute(
-            """
-            SELECT *
-            FROM cameras
-            WHERE camera_id = ?
-            """,
-            (camera_id,),
-        ).fetchone()
+        conn.commit()
 
         return {
             "success": True,
-            "camera": row_to_dict(row),
+            "message": f"Camera {camera_id} assigned function: {func_upper}",
+            "camera_id": camera_id,
+            "assigned_function": func_upper,
         }
-
     finally:
-        connection.close()
+        conn.close()
 
 
-@router.delete("/{camera_id}")
-def delete_camera(
-    camera_id: str,
-):
-    connection = get_connection()
-
+@router.patch("/{camera_id}/source")
+def assign_camera_source(camera_id: int, req: UpdateSourceRequest):
+    """Assigns video hardware or stream source to a camera."""
+    conn = get_connection()
     try:
-        ensure_table(connection)
-
-        existing = connection.execute(
-            """
-            SELECT *
-            FROM cameras
-            WHERE camera_id = ?
-            """,
-            (camera_id,),
+        cam = conn.execute(
+            "SELECT id FROM cameras WHERE id = ?", (camera_id,)
         ).fetchone()
+        if not cam:
+            raise HTTPException(status_code=404, detail="Camera not found")
 
-        if existing is None:
-            return {
-                "success": False,
-                "message": "Camera not found",
-            }
+        updates = ["source_type = ?", "source_url = ?"]
+        params = [req.source_type, req.source_url]
 
-        connection.execute(
-            """
-            DELETE FROM cameras
-            WHERE camera_id = ?
-            """,
-            (camera_id,),
-        )
+        if req.location:
+            updates.append("location = ?")
+            params.append(req.location)
+        if req.zone:
+            updates.append("zone = ?")
+            params.append(req.zone)
 
-        connection.commit()
+        params.append(camera_id)
+        conn.execute(f"UPDATE cameras SET {', '.join(updates)} WHERE id = ?", params)
+        conn.commit()
 
         return {
             "success": True,
-            "message": "Camera deleted",
+            "message": f"Camera {camera_id} source updated to {req.source_type} ({req.source_url})",
             "camera_id": camera_id,
         }
-
     finally:
-        connection.close()
+        conn.close()
 
 
-@router.get("/statistics/summary")
-def camera_statistics():
-    connection = get_connection()
-
+@router.patch("/{camera_id}/toggle-ai")
+def toggle_camera_ai(camera_id: int):
+    """Toggles AI perception processing on or off for this camera."""
+    conn = get_connection()
     try:
-        ensure_table(connection)
+        cam = conn.execute(
+            "SELECT id, ai_enabled FROM cameras WHERE id = ?", (camera_id,)
+        ).fetchone()
+        if not cam:
+            raise HTTPException(status_code=404, detail="Camera not found")
 
-        total = connection.execute(
-            """
-            SELECT COUNT(*)
-            FROM cameras
-            """
-        ).fetchone()[0]
-
-        online = connection.execute(
-            """
-            SELECT COUNT(*)
-            FROM cameras
-            WHERE UPPER(status) = 'ONLINE'
-            """
-        ).fetchone()[0]
-
-        offline = connection.execute(
-            """
-            SELECT COUNT(*)
-            FROM cameras
-            WHERE UPPER(status) = 'OFFLINE'
-            """
-        ).fetchone()[0]
-
-        connecting = connection.execute(
-            """
-            SELECT COUNT(*)
-            FROM cameras
-            WHERE UPPER(status) = 'CONNECTING'
-            """
-        ).fetchone()[0]
-
-        errors = connection.execute(
-            """
-            SELECT COUNT(*)
-            FROM cameras
-            WHERE UPPER(status) = 'ERROR'
-            """
-        ).fetchone()[0]
+        new_status = 0 if cam["ai_enabled"] == 1 else 1
+        conn.execute(
+            "UPDATE cameras SET ai_enabled = ? WHERE id = ?",
+            (new_status, camera_id),
+        )
+        conn.commit()
 
         return {
-            "total": total,
-            "online": online,
-            "offline": offline,
-            "connecting": connecting,
-            "errors": errors,
+            "success": True,
+            "camera_id": camera_id,
+            "ai_enabled": new_status,
         }
-
     finally:
-        connection.close()
+        conn.close()

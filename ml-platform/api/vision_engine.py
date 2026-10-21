@@ -71,14 +71,17 @@ last_attendance_time: Dict[int, float] = {}
 
 
 def process_frame(
-    frame: np.ndarray, camera_name: str = "Entrance Cam 01", camera_id: int = 1
+    frame: np.ndarray,
+    camera_name: str = "Entrance Cam 01",
+    camera_id: int = 1,
+    assigned_function: str = "FACE_ATTENDANCE",
 ) -> np.ndarray:
     """
     Runs multi-stage surveillance perception:
     1. YOLO Object Detection
     2. Face Detection & Recognition
-    3. Rule Evaluation (Restricted zones, weapons, fire, attendance)
-    4. HUD Rendering
+    3. Function-Specific Rule Evaluation (Attendance, Perimeter Intrusion, PPE, Hazards)
+    4. Tactical HUD Rendering
     """
     h, w = frame.shape[:2]
     now = time.time()
@@ -119,47 +122,75 @@ def process_frame(
         except Exception as e:
             print(f"[VisionEngine] Face detection error: {e}")
 
-    # 3. Rule Evaluation & Database Event Persistence
+    # 3. Rule Evaluation & Database Event Persistence based on Assigned Camera Function
     conn = None
     try:
         conn = get_db_connection()
+        func_upper = assigned_function.upper()
 
-        # A. Attendance rule check (if person & face detected on camera)
-        if (
-            any(d["name"] == "person" for d in detected_objects)
-            and len(detected_faces) > 0
-        ):
-            # Query enrolled people
-            enrolled = conn.execute(
-                "SELECT id, name, identifier FROM people WHERE is_enrolled = 1 LIMIT 5"
-            ).fetchall()
-            if enrolled:
-                # Associate with top enrolled student for demonstration
-                matched_student = enrolled[0]
-                student_id = matched_student["id"]
+        # A. Attendance Function (Gate / Turnstile / Classroom)
+        if func_upper in ["FACE_ATTENDANCE", "DEFAULT"]:
+            if (
+                any(d["name"] == "person" for d in detected_objects)
+                and len(detected_faces) > 0
+            ):
+                enrolled = conn.execute(
+                    "SELECT id, name, identifier FROM people WHERE is_enrolled = 1 LIMIT 5"
+                ).fetchall()
+                if enrolled:
+                    matched_student = enrolled[0]
+                    student_id = matched_student["id"]
 
-                # Cooldown check: 1 attendance per student per 10 minutes
-                if now - last_attendance_time.get(student_id, 0) > 300:
-                    last_attendance_time[student_id] = now
-                    # Check if already present today
-                    exists = conn.execute(
-                        """
-                        SELECT id FROM attendance_records WHERE person_id = ? AND timestamp LIKE ?
-                    """,
-                        (student_id, f"{today_str}%"),
-                    ).fetchone()
-                    if not exists:
-                        status = "LATE" if datetime.now().hour >= 9 else "PRESENT"
-                        conn.execute(
+                    if now - last_attendance_time.get(student_id, 0) > 300:
+                        last_attendance_time[student_id] = now
+                        exists = conn.execute(
                             """
-                            INSERT INTO attendance_records (person_id, camera_id, environment_id, timestamp, confidence, status)
-                            VALUES (?, ?, 1, ?, 0.94, ?)
+                            SELECT id FROM attendance_records WHERE person_id = ? AND timestamp LIKE ?
                         """,
-                            (student_id, camera_id, now_str, status),
-                        )
-                        conn.commit()
+                            (student_id, f"{today_str}%"),
+                        ).fetchone()
+                        if not exists:
+                            status = "LATE" if datetime.now().hour >= 9 else "PRESENT"
+                            conn.execute(
+                                """
+                                INSERT INTO attendance_records (person_id, camera_id, environment_id, timestamp, confidence, status)
+                                VALUES (?, ?, 1, ?, 0.94, ?)
+                            """,
+                                (student_id, camera_id, now_str, status),
+                            )
+                            conn.commit()
 
-        # B. Hazard / Threat alerts (fire, weapon, restricted area)
+        # B. Perimeter Intrusion Detection (Sterile fences, vaults, borders)
+        if func_upper in ["PERIMETER_INTRUSION", "RESTRICTED_ZONE"]:
+            person_dets = [d for d in detected_objects if d["name"] == "person"]
+            if person_dets and (
+                now - last_alert_time.get("perimeter_intrusion", 0) > 40
+            ):
+                last_alert_time["perimeter_intrusion"] = now
+                conn.execute(
+                    """
+                    INSERT INTO alerts (timestamp, object, priority, confidence, status, camera_id)
+                    VALUES (?, 'RESTRICTED PERIMETER INTRUSION', 'CRITICAL', ?, 'ACTIVE', ?)
+                """,
+                    (now_str, person_dets[0]["conf"], str(camera_id)),
+                )
+                conn.commit()
+
+        # C. Crowd Density & Loitering Alert
+        if func_upper in ["CROWD_LOITERING"]:
+            person_count = sum(1 for d in detected_objects if d["name"] == "person")
+            if person_count >= 3 and (now - last_alert_time.get("crowd_alert", 0) > 60):
+                last_alert_time["crowd_alert"] = now
+                conn.execute(
+                    """
+                    INSERT INTO alerts (timestamp, object, priority, confidence, status, camera_id)
+                    VALUES (?, 'HIGH CROWD DENSITY CONGESTION', 'HIGH', 0.92, 'ACTIVE', ?)
+                """,
+                    (now_str, str(camera_id)),
+                )
+                conn.commit()
+
+        # D. Hazard / Threat alerts (Fire, smoke, weapons)
         threat_classes = {
             "fire": "CRITICAL",
             "weapon": "CRITICAL",
@@ -188,11 +219,9 @@ def process_frame(
                     )
                     conn.commit()
 
-            # Record sample detections to database periodically
-            if (
-                d["name"] in ["person", "car", "backpack", "laptop"]
-                and now - last_alert_time.get(d["name"], 0) > 10
-            ):
+        # Record detections periodically
+        for d in detected_objects:
+            if now - last_alert_time.get(d["name"], 0) > 10:
                 last_alert_time[d["name"]] = now
                 conn.execute(
                     """
@@ -272,6 +301,20 @@ def process_frame(
         cv2.FONT_HERSHEY_SIMPLEX,
         0.5,
         (180, 190, 200),
+        1,
+        cv2.LINE_AA,
+    )
+
+    # Bottom Tactical Function & Status Banner
+    cv2.rectangle(output, (0, h - 30), (w, h), (14, 18, 25), -1)
+    func_display = f"OPERATIONAL FUNCTION: {assigned_function.replace('_', ' ')} • REAL-TIME AI PIPELINE ACTIVE"
+    cv2.putText(
+        output,
+        func_display,
+        (14, h - 10),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.42,
+        (0, 229, 255),
         1,
         cv2.LINE_AA,
     )
