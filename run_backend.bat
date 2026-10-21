@@ -1,21 +1,25 @@
 @echo off
-title Sentronix AI - Core Backend Server
-echo ========================================================
-echo        SENTRONIX AI — CORE VISION & API BACKEND
-echo ========================================================
+title Sentronix AI Backend
+echo ============================================================
+echo        SENTRONIX AI  -  Backend API Server
+echo ============================================================
+echo.
+
+rem  Change to the directory where this .bat lives (project root)
 cd /d "%~dp0"
 
+rem  Use .venv python if present, otherwise fall back to system python
 if exist ".venv\Scripts\python.exe" (
-    set PYTHON_EXEC=.venv\Scripts\python.exe
+    set "PY=.venv\Scripts\python.exe"
 ) else (
-    set PYTHON_EXEC=python
+    set "PY=python"
 )
 
-set PYTHONPATH=%~dp0ml-platform;%PYTHONPATH%
+echo  Running from: %CD%
+echo  Python      : %PY%
+echo.
 
-echo Initializing database schema & 80 cameras fleet...
-%PYTHON_EXEC% ml-platform/database/database_schema.py
+rem  Use the universal launcher — handles all path setup internally
+%PY% sentronix_run.py
 
-echo Starting Uvicorn API on http://0.0.0.0:8000 ...
-%PYTHON_EXEC% -m uvicorn api.main:app --app-dir "%~dp0ml-platform" --host 0.0.0.0 --port 8000 --reload
 pause

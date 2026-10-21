@@ -33,33 +33,29 @@ class TestSentronixFullStack(unittest.TestCase):
         import uuid
 
         uid = uuid.uuid4().hex[:6]
-        # Register new operator
+        # Register — no OTP. Fields: username (User ID), phone, email, password
         username = f"test_guard_{uid}"
         email = f"guard_{uid}@school.edu"
+        phone = f"+91{uid}"
         reg_res = self.client.post(
             "/auth/register",
             json={
                 "username": username,
+                "phone": phone,
                 "email": email,
-                "full_name": "Campus Security Officer",
                 "password": "Password123!",
                 "role": "operator",
             },
         )
         self.assertEqual(reg_res.status_code, 200)
-        otp = reg_res.json()["dev_mock_otp"]
-        self.assertTrue(len(otp) == 6)
+        reg_data = reg_res.json()
+        self.assertTrue(reg_data["success"])
+        self.assertIn("access_token", reg_data)
 
-        # Verify OTP
-        verify_res = self.client.post(
-            "/auth/verify-otp", json={"email": email, "otp": otp}
-        )
-        self.assertEqual(verify_res.status_code, 200)
-
-        # Login
+        # Login — accepts username OR email OR phone via "identifier" field
         login_res = self.client.post(
             "/auth/login",
-            json={"username_or_email": username, "password": "Password123!"},
+            json={"identifier": username, "password": "Password123!"},
         )
         self.assertEqual(login_res.status_code, 200)
         self.assertIn("access_token", login_res.json())

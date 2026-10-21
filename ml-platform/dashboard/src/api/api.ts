@@ -138,11 +138,6 @@ export const registerUser = async (data: any) => {
     return res.data;
 };
 
-export const verifyOtp = async (data: any) => {
-    const res = await API.post("/auth/verify-otp", data);
-    return res.data;
-};
-
 export const getEnvironments = async () => {
     const res = await API.get("/environments");
     return res.data;
