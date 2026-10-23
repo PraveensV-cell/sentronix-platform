@@ -1,5 +1,6 @@
 import json
 import sqlite3
+import datetime
 from pathlib import Path
 from typing import Optional, List
 from fastapi import APIRouter, HTTPException
@@ -25,10 +26,26 @@ class CreatePersonRequest(BaseModel):
     name: str
     identifier: str  # Student / Staff ID (e.g. STU-101)
     role: str = "student"  # student, staff, visitor
-    department: Optional[str] = None
-    class_grade: Optional[str] = None
+    department: Optional[str] = "General"
+    class_grade: Optional[str] = "Standard"
+    allowed_dress: Optional[str] = "Formals & Regular Uniform"
+    phone: Optional[str] = None
+    email: Optional[str] = None
     photo_url: Optional[str] = None
     environment_id: Optional[int] = 1
+
+
+class UpdatePersonRequest(BaseModel):
+    name: Optional[str] = None
+    identifier: Optional[str] = None
+    role: Optional[str] = None
+    department: Optional[str] = None
+    class_grade: Optional[str] = None
+    allowed_dress: Optional[str] = None
+    status: Optional[str] = None  # active, suspended, graduated, on_leave
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    photo_url: Optional[str] = None
 
 
 class EnrollFaceRequest(BaseModel):
@@ -42,16 +59,13 @@ def list_people(role: Optional[str] = None, environment_id: Optional[int] = 1):
     try:
         query = "SELECT * FROM people WHERE environment_id = ?"
         params = [environment_id]
-        if role:
+        if role and role != "ALL":
             query += " AND role = ?"
             params.append(role)
         query += " ORDER BY id DESC"
 
         rows = conn.execute(query, params).fetchall()
         people = [dict(r) for r in rows]
-
-        # Check today's attendance for each person
-        import datetime
 
         today = datetime.datetime.now().strftime("%Y-%m-%d")
         for p in people:
@@ -73,6 +87,34 @@ def list_people(role: Optional[str] = None, environment_id: Optional[int] = 1):
         conn.close()
 
 
+@router.get("/{person_id}")
+def get_person(person_id: int):
+    conn = get_connection()
+    try:
+        row = conn.execute("SELECT * FROM people WHERE id = ?", (person_id,)).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Person not found")
+        person = dict(row)
+
+        today = datetime.datetime.now().strftime("%Y-%m-%d")
+        att = conn.execute(
+            """
+            SELECT timestamp, status, confidence FROM attendance_records
+            WHERE person_id = ? AND timestamp LIKE ?
+            ORDER BY id DESC LIMIT 1
+        """,
+            (person_id, f"{today}%"),
+        ).fetchone()
+        if att:
+            person["today_attendance"] = dict(att)
+        else:
+            person["today_attendance"] = {"status": "ABSENT", "timestamp": None}
+
+        return {"success": True, "person": person}
+    finally:
+        conn.close()
+
+
 @router.post("")
 def create_person(req: CreatePersonRequest):
     conn = get_connection()
@@ -86,16 +128,22 @@ def create_person(req: CreatePersonRequest):
         cursor = conn.cursor()
         cursor.execute(
             """
-            INSERT INTO people (environment_id, identifier, name, role, department, class_grade, photo_url, is_enrolled, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, 0, 'active')
+            INSERT INTO people (
+                environment_id, identifier, name, role, department,
+                class_grade, allowed_dress, phone, email, photo_url, is_enrolled, status
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'active')
         """,
             (
                 req.environment_id or 1,
                 req.identifier,
                 req.name,
                 req.role,
-                req.department,
-                req.class_grade,
+                req.department or "General",
+                req.class_grade or "Standard",
+                req.allowed_dress or "Formals & Regular Uniform",
+                req.phone,
+                req.email,
                 req.photo_url,
             ),
         )
@@ -104,7 +152,7 @@ def create_person(req: CreatePersonRequest):
 
         return {
             "success": True,
-            "message": "Person registered. Proceed to face enrollment.",
+            "message": f"Registered {req.name}. Proceed to face enrollment.",
             "person": {
                 "id": new_id,
                 "identifier": req.identifier,
@@ -112,8 +160,185 @@ def create_person(req: CreatePersonRequest):
                 "role": req.role,
                 "department": req.department,
                 "class_grade": req.class_grade,
+                "allowed_dress": req.allowed_dress or "Formals & Regular Uniform",
+                "phone": req.phone,
+                "email": req.email,
                 "is_enrolled": 0,
             },
+        }
+    finally:
+        conn.close()
+
+
+@router.patch("/{person_id}")
+def update_person(person_id: int, req: UpdatePersonRequest):
+    """Allows modifying person name, ID, department, dress code, role, status, etc."""
+    conn = get_connection()
+    try:
+        person = conn.execute(
+            "SELECT * FROM people WHERE id = ?", (person_id,)
+        ).fetchone()
+        if not person:
+            raise HTTPException(status_code=404, detail="Person not found")
+
+        # If identifier changed, verify uniqueness
+        if req.identifier and req.identifier != person["identifier"]:
+            dup = conn.execute(
+                "SELECT id FROM people WHERE identifier = ? AND id != ?",
+                (req.identifier, person_id),
+            ).fetchone()
+            if dup:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Identifier is already taken by another person",
+                )
+
+        updates = []
+        params = []
+        for field in [
+            "name",
+            "identifier",
+            "role",
+            "department",
+            "class_grade",
+            "allowed_dress",
+            "status",
+            "phone",
+            "email",
+            "photo_url",
+        ]:
+            val = getattr(req, field, None)
+            if val is not None:
+                updates.append(f"{field} = ?")
+                params.append(val)
+
+        if updates:
+            params.append(person_id)
+            conn.execute(
+                f"UPDATE people SET {', '.join(updates)} WHERE id = ?",
+                tuple(params),
+            )
+            conn.commit()
+
+        updated = conn.execute(
+            "SELECT * FROM people WHERE id = ?", (person_id,)
+        ).fetchone()
+        return {
+            "success": True,
+            "message": f"Profile for {updated['name']} updated successfully",
+            "person": dict(updated),
+        }
+    finally:
+        conn.close()
+
+
+@router.get("/{person_id}/history")
+def get_person_history(person_id: int):
+    """Returns an individual records table: Attendance records, dress checks, alerts."""
+    conn = get_connection()
+    try:
+        person = conn.execute(
+            "SELECT * FROM people WHERE id = ?", (person_id,)
+        ).fetchone()
+        if not person:
+            raise HTTPException(status_code=404, detail="Person not found")
+
+        # Attendance logs with camera names
+        att_rows = conn.execute(
+            """
+            SELECT a.id, a.timestamp, a.status, a.confidence, c.camera_name, a.presence_seconds
+            FROM attendance_records a
+            LEFT JOIN cameras c ON a.camera_id = c.id
+            WHERE a.person_id = ?
+            ORDER BY a.id DESC
+            LIMIT 50
+        """,
+            (person_id,),
+        ).fetchall()
+
+        # Detections / Alerts / Incident history
+        alert_rows = conn.execute(
+            """
+            SELECT id, timestamp, object, priority, status, camera_id
+            FROM alerts
+            WHERE object LIKE ? OR object LIKE ?
+            ORDER BY id DESC
+            LIMIT 20
+        """,
+            (f"%{person['name']}%", f"%{person['identifier']}%"),
+        ).fetchall()
+
+        history_records = []
+        for a in att_rows:
+            history_records.append(
+                {
+                    "id": a["id"],
+                    "type": "ATTENDANCE",
+                    "timestamp": a["timestamp"],
+                    "camera": a["camera_name"] or "Camera #1",
+                    "event": "Automated Face Scan Check-in",
+                    "status": a["status"],
+                    "confidence": a["confidence"] or 0.95,
+                    "notes": "Identity verified via facial biometrics",
+                }
+            )
+
+        for al in alert_rows:
+            history_records.append(
+                {
+                    "id": al["id"],
+                    "type": "SECURITY_ALERT",
+                    "timestamp": al["timestamp"],
+                    "camera": f"Camera #{al['camera_id']}",
+                    "event": al["object"],
+                    "status": al["status"],
+                    "confidence": 0.90,
+                    "notes": f"Priority: {al['priority']}",
+                }
+            )
+
+        # Sort combined history by timestamp descending
+        history_records.sort(key=lambda x: str(x["timestamp"]), reverse=True)
+
+        return {
+            "success": True,
+            "person": dict(person),
+            "total_records": len(history_records),
+            "history": history_records,
+        }
+    finally:
+        conn.close()
+
+
+@router.post("/{person_id}/mark-present")
+def mark_person_present(person_id: int):
+    """Manually marks attendance present for this individual today."""
+    conn = get_connection()
+    try:
+        person = conn.execute(
+            "SELECT * FROM people WHERE id = ?", (person_id,)
+        ).fetchone()
+        if not person:
+            raise HTTPException(status_code=404, detail="Person not found")
+
+        now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        status = "PRESENT"
+
+        conn.execute(
+            """
+            INSERT INTO attendance_records (person_id, camera_id, environment_id, timestamp, confidence, status)
+            VALUES (?, 1, ?, ?, 1.0, ?)
+        """,
+            (person_id, person["environment_id"] or 1, now_str, status),
+        )
+        conn.commit()
+
+        return {
+            "success": True,
+            "message": f"Marked {person['name']} as PRESENT for {now_str}",
+            "person_id": person_id,
+            "status": "PRESENT",
+            "timestamp": now_str,
         }
     finally:
         conn.close()
@@ -129,7 +354,6 @@ def enroll_face(person_id: int, req: EnrollFaceRequest):
         if not person:
             raise HTTPException(status_code=404, detail="Person not found")
 
-        # Store simulated embedding vector (128-dim or custom) if not provided
         embedding = req.embedding or [0.1 * ((i + person_id) % 10) for i in range(128)]
         embedding_json = json.dumps(embedding)
 

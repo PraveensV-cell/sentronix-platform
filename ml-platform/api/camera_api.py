@@ -47,7 +47,19 @@ CAMERA_FUNCTIONS = [
         "id": "FACE_ATTENDANCE",
         "label": "Face Recognition & Automated Attendance",
         "icon": "🎓",
-        "description": "Localizes human faces, performs neural identity matching against registry, and logs student/staff attendance check-ins.",
+        "description": "Localizes human faces, performs neural identity matching against student/staff registry, and logs attendance check-ins. Flags unknown persons.",
+    },
+    {
+        "id": "DRESS_CODE",
+        "label": "Dress Code & School Uniform Verification",
+        "icon": "👔",
+        "description": "Enforces school/college dress code policy. Only formals and regular school uniforms are allowed; flags casual wear and infractions.",
+    },
+    {
+        "id": "EXAM_MONITOR",
+        "label": "Exam Hall Proctoring & Cheating Detection",
+        "icon": "📝",
+        "description": "Monitors examination halls, detects prohibited smartphone usage, collaboration, unauthorized materials, and suspicious movements.",
     },
     {
         "id": "PERIMETER_INTRUSION",
@@ -57,15 +69,15 @@ CAMERA_FUNCTIONS = [
     },
     {
         "id": "DRESS_CODE_PPE",
-        "label": "Dress-Code, Uniform & PPE Compliance",
-        "icon": "👔",
-        "description": "Enforces dress code policies, hardhat/vest compliance in industrial blocks, and lab coat wear in research environments.",
+        "label": "Industrial PPE & Safety Gear Compliance",
+        "icon": "🦺",
+        "description": "Enforces hardhat, high-vis safety vest, and protective eyewear compliance in industrial workshops and construction zones.",
     },
     {
         "id": "FIRE_SMOKE_HAZARD",
         "label": "Fire, Smoke & Thermal Hazard Alert",
         "icon": "🔥",
-        "description": "Detects real-time fire outbreaks, smoke accumulation, or chemical vat leakage using multi-spectral computer vision.",
+        "description": "Detects real-time fire outbreaks, smoke accumulation, or thermal hazards using computer vision neural networks.",
     },
     {
         "id": "CROWD_LOITERING",
@@ -77,13 +89,13 @@ CAMERA_FUNCTIONS = [
         "id": "WEAPON_VIOLENCE",
         "label": "Weapon Detection & Violence Alert",
         "icon": "🚨",
-        "description": "Real-time identification of brandished weapons, knives, physical altercations, or violent aggression.",
+        "description": "Real-time identification of brandished weapons, knives, physical altercations, or aggressive violent behaviors.",
     },
     {
         "id": "ANPR_VEHICLES",
         "label": "Vehicle Access & ANPR License Plate",
         "icon": "🚗",
-        "description": "Monitors ingress/egress boom barriers, weighs stations, and enforces authorized parking lot allocation.",
+        "description": "Monitors ingress/egress boom barriers, weigh stations, and enforces authorized parking lot allocation.",
     },
 ]
 
@@ -119,7 +131,7 @@ def get_cameras(
                 c.source_url,
                 c.location,
                 c.zone,
-                COALESCE(c.assigned_function, 'FACE_ATTENDANCE') AS assigned_function,
+                c.assigned_function,
                 c.status,
                 c.ai_enabled,
                 c.processing_fps,
@@ -144,8 +156,8 @@ def get_cameras(
             params.append(assigned_function.upper())
 
         if search:
-            query += " AND (c.camera_name LIKE ? OR c.location LIKE ? OR c.zone LIKE ?)"
-            term = f"%{search}%"
+            query += " AND (LOWER(c.camera_name) LIKE ? OR LOWER(c.location) LIKE ? OR LOWER(c.zone) LIKE ?)"
+            term = f"%{search.lower()}%"
             params.extend([term, term, term])
 
         query += " ORDER BY c.id ASC LIMIT ? OFFSET ?"

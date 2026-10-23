@@ -71,6 +71,10 @@ export interface Person {
     role: string;
     department?: string;
     class_grade?: string;
+    allowed_dress?: string;
+    phone?: string;
+    email?: string;
+    status?: string;
     photo_url?: string;
     is_enrolled: number;
     today_attendance?: {
@@ -148,6 +152,11 @@ export const createEnvironment = async (data: any) => {
     return res.data;
 };
 
+export const updateEnvironment = async (envId: number, data: { name?: string; type?: string; description?: string; location?: string }) => {
+    const res = await API.patch(`/environments/${envId}`, data);
+    return res.data;
+};
+
 export const updateEnvironmentFeatures = async (envId: number, features: string[]) => {
     const res = await API.patch(`/environments/${envId}/features`, { enabled_features: features });
     return res.data;
@@ -191,8 +200,33 @@ export const getPeople = async (role?: string) => {
     return res.data;
 };
 
+export const getPerson = async (personId: number) => {
+    const res = await API.get(`/people/${personId}`);
+    return res.data;
+};
+
 export const createPerson = async (data: any) => {
     const res = await API.post("/people", data);
+    return res.data;
+};
+
+export const updatePerson = async (personId: number, data: any) => {
+    const res = await API.patch(`/people/${personId}`, data);
+    return res.data;
+};
+
+export const getPersonHistory = async (personId: number) => {
+    const res = await API.get(`/people/${personId}/history`);
+    return res.data;
+};
+
+export const markPersonPresent = async (personId: number) => {
+    const res = await API.post(`/people/${personId}/mark-present`);
+    return res.data;
+};
+
+export const deletePerson = async (personId: number) => {
+    const res = await API.delete(`/people/${personId}`);
     return res.data;
 };
 

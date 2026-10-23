@@ -33,6 +33,13 @@ class UpdateFeaturesRequest(BaseModel):
     enabled_features: List[str]
 
 
+class UpdateEnvironmentRequest(BaseModel):
+    name: Optional[str] = None
+    type: Optional[str] = None
+    description: Optional[str] = None
+    location: Optional[str] = None
+
+
 @router.get("")
 def list_environments():
     conn = get_connection()
@@ -106,6 +113,62 @@ def get_environment(env_id: int):
         except Exception:
             env_dict["enabled_features"] = []
         return {"success": True, "environment": env_dict}
+    finally:
+        conn.close()
+
+
+@router.patch("/{env_id}")
+def update_environment(env_id: int, req: UpdateEnvironmentRequest):
+    """Allows renaming and modifying mode metadata."""
+    conn = get_connection()
+    try:
+        row = conn.execute(
+            "SELECT * FROM environments WHERE id = ?", (env_id,)
+        ).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Environment not found")
+
+        updates = []
+        params = []
+        if req.name is not None:
+            updates.append("name = ?")
+            params.append(req.name)
+        if req.type is not None:
+            updates.append("type = ?")
+            params.append(req.type)
+        if req.description is not None:
+            updates.append("description = ?")
+            params.append(req.description)
+        if req.location is not None:
+            updates.append("location = ?")
+            params.append(req.location)
+
+        if updates:
+            params.append(env_id)
+            conn.execute(
+                f"UPDATE environments SET {', '.join(updates)} WHERE id = ?",
+                tuple(params),
+            )
+            conn.commit()
+
+        updated = conn.execute(
+            "SELECT * FROM environments WHERE id = ?", (env_id,)
+        ).fetchone()
+        env_dict = dict(updated)
+        try:
+            env_dict["enabled_features"] = (
+                json.loads(env_dict["enabled_features"])
+                if env_dict["enabled_features"]
+                else []
+            )
+        except Exception:
+            env_dict["enabled_features"] = []
+
+        return {
+            "success": True,
+            "message": "Environment updated successfully",
+            "environment": env_dict,
+        }
     finally:
         conn.close()
 

@@ -284,6 +284,15 @@ def init_database():
     migrate_columns(cursor, "detections", {"track_id": "INTEGER"})
     migrate_columns(
         cursor,
+        "people",
+        {
+            "allowed_dress": "TEXT DEFAULT 'Formals & Regular Uniform'",
+            "phone": "TEXT",
+            "email": "TEXT",
+        },
+    )
+    migrate_columns(
+        cursor,
         "cameras",
         {
             "assigned_function": "TEXT DEFAULT 'FACE_ATTENDANCE'",

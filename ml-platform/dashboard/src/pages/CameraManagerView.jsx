@@ -24,9 +24,11 @@ const SECTORS = [
 const FUNCTIONS_CATALOG = [
     { id: "all", label: "All Functions", icon: "🌐" },
     { id: "FACE_ATTENDANCE", label: "Face Attendance", icon: "🎓", desc: "Face matching and student/staff attendance check-in" },
+    { id: "DRESS_CODE", label: "Dress Code (Formals)", icon: "👔", desc: "School uniform & regular formals dress compliance check" },
+    { id: "EXAM_MONITOR", label: "Exam Hall Proctoring", icon: "📝", desc: "Monitors exam halls, detects smartphones & cheating" },
     { id: "PERIMETER_INTRUSION", label: "Perimeter Intrusion", icon: "⛔", desc: "Boundary fence tripwire and sterile zone alerts" },
-    { id: "DRESS_CODE_PPE", label: "Dress Code & PPE", icon: "👔", desc: "Attire, uniform, hardhat & safety vest verification" },
-    { id: "FIRE_SMOKE_HAZARD", label: "Fire & Hazard", icon: "🔥", desc: "Thermal heat, flame, smoke and vat leakage sensor" },
+    { id: "DRESS_CODE_PPE", label: "Industrial PPE & Safety", icon: "🦺", desc: "Hardhat, high-vis vest & safety eyewear verification" },
+    { id: "FIRE_SMOKE_HAZARD", label: "Fire & Hazard", icon: "🔥", desc: "Thermal heat, flame, smoke and chemical hazard alert" },
     { id: "CROWD_LOITERING", label: "Crowd & Loitering", icon: "👥", desc: "Congestion monitoring and dwell stagnation threshold" },
     { id: "WEAPON_VIOLENCE", label: "Weapon & Violence", icon: "🚨", desc: "Firearm, knife brandish and physical brawl alerts" },
     { id: "ANPR_VEHICLES", label: "Vehicle / ANPR", icon: "🚗", desc: "Vehicle license plate recognition and boom barrier gate" },
