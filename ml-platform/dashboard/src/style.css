@@ -4,39 +4,27 @@
 
 :root,
 [data-theme="light"],
-.theme-light {
-    --bg-main: #f8fafc;
-    --bg-secondary: #f1f5f9;
-    --card-bg: #ffffff;
-    --border-color: #e2e8f0;
-    --text-primary: #0f172a;
-    --text-secondary: #475569;
-    --text-muted: #64748b;
-    --primary-color: #0284c7;
-    --primary-soft: #f0f9ff;
+[data-theme="dark"],
+.theme-light,
+.theme-dark {
+    /* Royal Executive Obsidian Slate & Champagne Gold Palette */
+    --bg-main: #0c1017;
+    --bg-secondary: #111622;
+    --bg-panel: rgba(17, 24, 39, 0.88);
+    --card-bg: rgba(17, 24, 39, 0.88);
+    --border-color: rgba(212, 175, 55, 0.22);
+    --border-silver: rgba(203, 213, 225, 0.12);
+    --text-primary: #f8fafc;
+    --text-secondary: #cbd5e1;
+    --text-muted: #94a3b8;
+    --primary-color: #d4af37;
+    --primary-soft: rgba(212, 175, 55, 0.12);
     --success-color: #10b981;
     --danger-color: #ef4444;
     --warning-color: #f59e0b;
     --royal-gold: #d4af37;
-    --card-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
-}
-
-[data-theme="dark"],
-.theme-dark {
-    --bg-main: #0b1120;
-    --bg-secondary: #131d33;
-    --card-bg: #111827;
-    --border-color: #1e293b;
-    --text-primary: #f8fafc;
-    --text-secondary: #94a3b8;
-    --text-muted: #64748b;
-    --primary-color: #38bdf8;
-    --primary-soft: #082f49;
-    --success-color: #34d399;
-    --danger-color: #f87171;
-    --warning-color: #fbbf24;
-    --royal-gold: #f59e0b;
-    --card-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+    --royal-silver: #cbd5e1;
+    --card-shadow: 0 4px 20px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 /* Typographic Font Classes */
@@ -60,25 +48,55 @@
     font-family: "Fira Code", monospace !important;
 }
 
-/* Mode-Specific Theme Accents (Point 3) */
+/* Mode-Specific Theme Accents & Backgrounds */
 .mode-campus {
-    --mode-accent: #0284c7;
-    --mode-border: #bae6fd;
+    --mode-accent: #d4af37;
+    --mode-border: rgba(212, 175, 55, 0.35);
+    background-image: linear-gradient(180deg, rgba(12, 16, 23, 0.92) 0%, rgba(12, 16, 23, 0.97) 100%),
+        url('https://images.unsplash.com/photo-1541339907198-e08756dedf3f?w=1920&q=80');
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
 }
 
 .mode-military {
-    --mode-accent: #15803d;
-    --mode-border: #bbf7d0;
+    --mode-accent: #d4af37;
+    --mode-border: rgba(212, 175, 55, 0.35);
+    background-image: linear-gradient(180deg, rgba(8, 12, 18, 0.93) 0%, rgba(8, 12, 18, 0.98) 100%),
+        url('https://images.unsplash.com/photo-1508873696983-2df570464756?w=1920&q=80');
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
 }
 
 .mode-industry {
-    --mode-accent: #ea580c;
-    --mode-border: #fed7aa;
+    --mode-accent: #f59e0b;
+    --mode-border: rgba(245, 158, 11, 0.35);
+    background-image: linear-gradient(180deg, rgba(10, 14, 20, 0.92) 0%, rgba(10, 14, 20, 0.97) 100%),
+        url('https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=1920&q=80');
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
 }
 
 .mode-public {
-    --mode-accent: #0369a1;
-    --mode-border: #bae6fd;
+    --mode-accent: #0ea5e9;
+    --mode-border: rgba(14, 165, 233, 0.35);
+    background-image: linear-gradient(180deg, rgba(10, 16, 26, 0.92) 0%, rgba(10, 16, 26, 0.97) 100%),
+        url('https://images.unsplash.com/photo-1519501025264-65ba15a82390?w=1920&q=80');
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+}
+
+.mode-corporate {
+    --mode-accent: #d4af37;
+    --mode-border: rgba(212, 175, 55, 0.35);
+    background-image: linear-gradient(180deg, rgba(12, 15, 24, 0.92) 0%, rgba(12, 15, 24, 0.97) 100%),
+        url('https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=1920&q=80');
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
 }
 
 html,
@@ -121,7 +139,7 @@ img {
     max-width: 100%;
 }
 
-/* Custom 2D Scrollbars */
+/* Custom Executive Gold & Slate Scrollbars */
 ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
@@ -132,10 +150,10 @@ img {
 }
 
 ::-webkit-scrollbar-thumb {
-    background: var(--border-color);
+    background: rgba(212, 175, 55, 0.3);
     border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: var(--text-muted);
+    background: var(--royal-gold);
 }

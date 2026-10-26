@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react";
 import { getEnvironments, createEnvironment, updateEnvironment, updateEnvironmentFeatures } from "../api/api";
-import SetupWizardModal from "../components/SetupWizardModal";
+import OnboardingFlowModal from "../components/OnboardingFlowModal";
 
 const MODE_CAPABILITIES = {
     School: {
         title: "🏛️ Academic Campus & School Safety",
         tagline: "Educational Campus Surveillance • Uniform Standards • Biometric Attendance",
         themeClass: "mode-campus",
+        bgImg: "https://images.unsplash.com/photo-1541339907198-e08756dedf3f?w=1920&q=80",
         functions: [
             { id: "attendance", name: "Face Biometric Attendance", icon: "🎓", desc: "Automated scan, timestamping, deduplication, and mark PRESENT/LATE in real-time." },
             { id: "dress_code", name: "Dress Code & School Uniform", icon: "👔", desc: "Permits formals and regular uniform; flags casual clothes & non-compliant attire." },
@@ -19,6 +20,7 @@ const MODE_CAPABILITIES = {
         title: "🛡️ Military & Strategic Defense Command",
         tagline: "High-Security Perimeter Watch • Tactical Defense • Sentry Enforcement",
         themeClass: "mode-military",
+        bgImg: "https://images.unsplash.com/photo-1508873696983-2df570464756?w=1920&q=80",
         functions: [
             { id: "perimeter", name: "Sentry Perimeter & Intrusion Defense", icon: "🚨", desc: "Tripwire border breach, infrared motion, and unauthorized intruder interception." },
             { id: "weapon", name: "Weapon & Tactical Threat Intercept", icon: "⚔️", desc: "Real-time recognition of firearms, edged weapons, and suspicious payloads." },
@@ -31,6 +33,7 @@ const MODE_CAPABILITIES = {
         title: "🏭 Heavy Industry, Chemical & Plant Safety",
         tagline: "OSHA Safety Compliance • Hazard Mitigation • Restricted Machinery Zones",
         themeClass: "mode-industry",
+        bgImg: "https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=1920&q=80",
         functions: [
             { id: "ppe", name: "OSHA & PPE Safety Gear Compliance", icon: "🦺", desc: "Verifies mandatory hardhats, high-visibility vests, safety goggles, and masks." },
             { id: "hazard", name: "Fire, Smoke & Chemical Hazard Warning", icon: "🔥", desc: "Deep optical smoke and flame detection with instant safety klaxon dispatch." },
@@ -43,6 +46,7 @@ const MODE_CAPABILITIES = {
         title: "🏥 Public Places, Transit & Healthcare Hub",
         tagline: "Civic Surveillance • Crowd Density • Public Safety & Transit Thoroughfares",
         themeClass: "mode-public",
+        bgImg: "https://images.unsplash.com/photo-1519501025264-65ba15a82390?w=1920&q=80",
         functions: [
             { id: "crowd", name: "Crowd Density & Stampede Warning", icon: "👥", desc: "Monitors concourse density, detects bottleneck panics and stampedes." },
             { id: "abandoned", name: "Abandoned Object & Bag Detection", icon: "🧳", desc: "Detects stationary unattended luggage or packages in public thoroughfares." },
@@ -55,6 +59,7 @@ const MODE_CAPABILITIES = {
         title: "🌐 Corporate Campus & Enterprise Hub",
         tagline: "Enterprise Security • Executive Turnstiles • Server Room Biometrics",
         themeClass: "mode-campus",
+        bgImg: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=1920&q=80",
         functions: [
             { id: "executive_att", name: "Executive Face Attendance", icon: "🏢", desc: "Touchless turnstile check-in with millisecond biometric matching." },
             { id: "tailgating", name: "Anti-Tailgating & Badge Piggybacking", icon: "🚫", desc: "Detects unauthorized individuals following behind an authorized badge scan." },
@@ -68,22 +73,18 @@ const MODE_CAPABILITIES = {
 export default function EnvironmentSelectPage({ user, onEnvironmentSelected }) {
     const [environments, setEnvironments] = useState([]);
     const [selectedEnv, setSelectedEnv] = useState(null);
-    const [enabledFeatures, setEnabledFeatures] = useState([]);
     const [showCreateModal, setShowCreateModal] = useState(false);
-    const [showWizardModal, setShowWizardModal] = useState(false);
+    const [showOnboardingModal, setShowOnboardingModal] = useState(false);
     const [editingEnv, setEditingEnv] = useState(null);
 
     // Create environment form
     const [newName, setNewName] = useState("");
     const [newType, setNewType] = useState("School");
     const [newDesc, setNewDesc] = useState("");
-    const [newLocation, setNewLocation] = useState("");
 
     // Edit / Rename environment form
     const [editName, setEditName] = useState("");
     const [editType, setEditType] = useState("");
-    const [editDesc, setEditDesc] = useState("");
-    const [editLoc, setEditLoc] = useState("");
     const [feedback, setFeedback] = useState("");
 
     const loadEnvironments = async () => {
@@ -100,7 +101,6 @@ export default function EnvironmentSelectPage({ user, onEnvironmentSelected }) {
                     }
                     return first;
                 });
-                setEnabledFeatures(first.enabled_features || []);
             }
         } catch (err) {
             console.error("Failed to load environments", err);
@@ -113,7 +113,6 @@ export default function EnvironmentSelectPage({ user, onEnvironmentSelected }) {
 
     const handleSelectEnv = (env) => {
         setSelectedEnv(env);
-        setEnabledFeatures(env.enabled_features || []);
     };
 
     const handleOpenEdit = (e, env) => {
@@ -121,8 +120,6 @@ export default function EnvironmentSelectPage({ user, onEnvironmentSelected }) {
         setEditingEnv(env);
         setEditName(env.name || "");
         setEditType(env.type || "School");
-        setEditDesc(env.description || "");
-        setEditLoc(env.location || "");
     };
 
     const handleSaveEnvRename = async (e) => {
@@ -132,8 +129,6 @@ export default function EnvironmentSelectPage({ user, onEnvironmentSelected }) {
             const res = await updateEnvironment(editingEnv.id, {
                 name: editName,
                 type: editType,
-                description: editDesc,
-                location: editLoc,
             });
             if (res.success) {
                 setEditingEnv(null);
@@ -146,18 +141,11 @@ export default function EnvironmentSelectPage({ user, onEnvironmentSelected }) {
         }
     };
 
-    const handleDirectEnter = async () => {
-        if (!selectedEnv) return;
-        try {
-            await updateEnvironmentFeatures(selectedEnv.id, enabledFeatures);
-            const updated = { ...selectedEnv, enabled_features: enabledFeatures };
-            localStorage.setItem("sentronix_env", JSON.stringify(updated));
-            onEnvironmentSelected(updated);
-        } catch (err) {
-            const updated = { ...selectedEnv, enabled_features: enabledFeatures };
-            localStorage.setItem("sentronix_env", JSON.stringify(updated));
-            onEnvironmentSelected(updated);
-        }
+    const handleDirectEnter = (customEnv) => {
+        const env = customEnv || selectedEnv;
+        if (!env) return;
+        localStorage.setItem("sentronix_env", JSON.stringify(env));
+        onEnvironmentSelected(env);
     };
 
     const handleCreateNew = async (e) => {
@@ -167,14 +155,12 @@ export default function EnvironmentSelectPage({ user, onEnvironmentSelected }) {
                 name: newName,
                 type: newType,
                 description: newDesc,
-                location: newLocation,
                 enabled_features: ["face_detection", "attendance", "dress_code", "alerts"],
             });
             if (res.success) {
                 setShowCreateModal(false);
                 setNewName("");
                 setNewDesc("");
-                setNewLocation("");
                 setFeedback(`✓ Created new mode "${newName}"!`);
                 setTimeout(() => setFeedback(""), 4000);
                 await loadEnvironments();
@@ -187,48 +173,86 @@ export default function EnvironmentSelectPage({ user, onEnvironmentSelected }) {
     const currentCap = selectedEnv ? (MODE_CAPABILITIES[selectedEnv.type] || MODE_CAPABILITIES.School) : MODE_CAPABILITIES.School;
 
     return (
-        <div className="env-select-container" style={{ minHeight: "100vh", padding: "40px 20px" }}>
-            <div className="env-select-card" style={{ maxWidth: "1200px", margin: "0 auto", padding: "32px", borderRadius: "12px", border: "1px solid var(--border-color)", background: "var(--card-bg)" }}>
-                {/* Header */}
-                <div className="env-select-header" style={{ marginBottom: "24px", borderBottom: "1px solid var(--border-color)", paddingBottom: "18px" }}>
+        <div
+            className="env-select-container"
+            style={{
+                minHeight: "100vh",
+                padding: "36px 20px",
+                backgroundImage: `linear-gradient(180deg, rgba(10, 15, 24, 0.88) 0%, rgba(10, 15, 24, 0.96) 100%), url(${currentCap.bgImg})`,
+                backgroundSize: "cover",
+                backgroundPosition: "center",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+            }}
+        >
+            <div
+                className="env-select-card"
+                style={{
+                    maxWidth: "1200px",
+                    width: "100%",
+                    padding: "36px",
+                    borderRadius: "14px",
+                    border: "1px solid rgba(212, 175, 55, 0.25)",
+                    background: "rgba(14, 20, 31, 0.94)",
+                    backdropFilter: "blur(20px)",
+                    boxShadow: "0 20px 50px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.08)",
+                }}
+            >
+                {/* Executive Brand Header */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "26px", borderBottom: "1px solid rgba(255, 255, 255, 0.08)", paddingBottom: "20px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-                        <div className="brand-logo-icon large" style={{ width: "48px", height: "48px" }}>
-                            <div className="inner-radar"></div>
+                        <div
+                            style={{
+                                width: "50px",
+                                height: "50px",
+                                borderRadius: "50%",
+                                background: "linear-gradient(135deg, #d4af37 0%, #b8860b 100%)",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                boxShadow: "0 0 20px rgba(212, 175, 55, 0.4)",
+                                color: "#0c1017",
+                                fontSize: "22px",
+                                fontWeight: 800,
+                            }}
+                        >
+                            ⚜️
                         </div>
                         <div>
                             <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                                <h2 style={{ margin: 0, fontSize: "22px", fontWeight: 800 }}>
-                                    Operational Mode Selection &amp; Setup
+                                <h2 style={{ margin: 0, fontSize: "22px", fontWeight: 800, color: "#f8fafc", letterSpacing: "0.5px" }}>
+                                    Operational Deployment Mode
                                 </h2>
-                                <span style={{ fontSize: "11px", background: "var(--primary-color)", color: "#ffffff", padding: "2px 10px", borderRadius: "12px", fontWeight: 700 }}>
-                                    24/7 AI READY
+                                <span style={{ fontSize: "10px", background: "rgba(212, 175, 55, 0.2)", color: "#d4af37", border: "1px solid rgba(212, 175, 55, 0.4)", padding: "2px 8px", borderRadius: "10px", fontWeight: 700 }}>
+                                    ENTERPRISE 3.0
                                 </span>
                             </div>
-                            <p style={{ margin: "4px 0 0 0", fontSize: "13px", color: "var(--text-secondary)" }}>
-                                Welcome, <strong>{user?.name || user?.full_name || user?.username}</strong>. Choose or customize your surveillance domain below.
+                            <p style={{ margin: "4px 0 0 0", fontSize: "13px", color: "#94a3b8" }}>
+                                Welcome, <strong>{user?.name || user?.full_name || user?.username}</strong>. Select your domain to configure datasets and cameras.
                             </p>
                         </div>
                     </div>
+
+                    <button
+                        type="button"
+                        onClick={() => setShowCreateModal(true)}
+                        className="tool-btn btn-secondary-mini"
+                        style={{ border: "1px solid rgba(255,255,255,0.15)", background: "rgba(255,255,255,0.05)", color: "#cbd5e1", padding: "8px 16px", fontSize: "12px", fontWeight: 600 }}
+                    >
+                        + Create Custom Domain
+                    </button>
                 </div>
 
-                {feedback && <div className="checkin-feedback-banner" style={{ marginBottom: "16px" }}>{feedback}</div>}
+                {feedback && <div className="checkin-feedback-banner" style={{ marginBottom: "18px" }}>{feedback}</div>}
 
                 {/* Section 1: Modes Grid */}
-                <div style={{ marginBottom: "24px" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
-                        <h3 style={{ margin: 0, fontSize: "15px", fontWeight: 700 }}>
-                            1. Select Deployment Mode
-                        </h3>
-                        <button
-                            className="tool-btn btn-secondary-mini"
-                            onClick={() => setShowCreateModal(true)}
-                            style={{ fontSize: "12px", fontWeight: 600 }}
-                        >
-                            + Add Custom Mode
-                        </button>
+                <div style={{ marginBottom: "26px" }}>
+                    <div style={{ fontSize: "12px", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "12px" }}>
+                        1. Select Surveillance Domain
                     </div>
 
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "14px" }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: "14px" }}>
                         {environments.map((env) => {
                             const isSelected = selectedEnv?.id === env.id;
                             const cap = MODE_CAPABILITIES[env.type] || MODE_CAPABILITIES.School;
@@ -239,14 +263,15 @@ export default function EnvironmentSelectPage({ user, onEnvironmentSelected }) {
                                     style={{
                                         padding: "16px",
                                         borderRadius: "10px",
-                                        border: `2px solid ${isSelected ? "var(--primary-color)" : "var(--border-color)"}`,
-                                        background: isSelected ? "var(--primary-soft)" : "var(--bg-secondary)",
+                                        border: isSelected ? "2px solid #d4af37" : "1px solid rgba(255, 255, 255, 0.08)",
+                                        background: isSelected ? "rgba(212, 175, 55, 0.12)" : "rgba(255, 255, 255, 0.02)",
                                         cursor: "pointer",
                                         transition: "all 0.15s ease",
                                         display: "flex",
                                         flexDirection: "column",
                                         justifyContent: "space-between",
-                                        minHeight: "130px",
+                                        minHeight: "125px",
+                                        boxShadow: isSelected ? "0 4px 20px rgba(212, 175, 55, 0.15)" : "none",
                                     }}
                                 >
                                     <div>
@@ -257,23 +282,23 @@ export default function EnvironmentSelectPage({ user, onEnvironmentSelected }) {
                                             <button
                                                 type="button"
                                                 onClick={(e) => handleOpenEdit(e, env)}
-                                                style={{ background: "transparent", border: "none", fontSize: "12px", cursor: "pointer", color: "var(--text-secondary)" }}
-                                                title="Rename this mode"
+                                                style={{ background: "transparent", border: "none", fontSize: "11px", cursor: "pointer", color: "#94a3b8" }}
+                                                title="Rename mode"
                                             >
                                                 ✏️ Rename
                                             </button>
                                         </div>
-                                        <div style={{ fontSize: "14px", fontWeight: 700, marginTop: "8px", color: "var(--text-primary)" }}>
+                                        <div style={{ fontSize: "14px", fontWeight: 700, marginTop: "8px", color: "#f8fafc" }}>
                                             {env.name}
                                         </div>
                                     </div>
                                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "10px" }}>
-                                        <span className="cam-func-badge badge-primary" style={{ fontSize: "10px" }}>
-                                            {env.type.toUpperCase()}
+                                        <span style={{ fontSize: "10px", color: isSelected ? "#d4af37" : "#94a3b8", fontWeight: 700, textTransform: "uppercase" }}>
+                                            {env.type}
                                         </span>
                                         {isSelected && (
-                                            <span style={{ fontSize: "11px", color: "var(--primary-color)", fontWeight: 700 }}>
-                                                ✓ ACTIVE
+                                            <span style={{ fontSize: "10px", color: "#d4af37", fontWeight: 800 }}>
+                                                ● ACTIVE
                                             </span>
                                         )}
                                     </div>
@@ -283,33 +308,32 @@ export default function EnvironmentSelectPage({ user, onEnvironmentSelected }) {
                     </div>
                 </div>
 
-                {/* Section 2: Mode-Specific Capabilities Box (Points 2 & 3) */}
+                {/* Section 2: Mode-Specific Capabilities Showcase */}
                 {selectedEnv && (
-                    <div style={{ padding: "20px", borderRadius: "10px", background: "var(--bg-secondary)", border: "1px solid var(--border-color)", marginBottom: "24px" }}>
+                    <div style={{ padding: "20px 24px", borderRadius: "10px", background: "rgba(0, 0, 0, 0.35)", border: "1px solid rgba(255, 255, 255, 0.08)", marginBottom: "26px" }}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
                             <div>
-                                <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 700 }}>
+                                <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 700, color: "#f8fafc" }}>
                                     {currentCap.title}
                                 </h3>
-                                <p style={{ margin: "2px 0 0 0", fontSize: "12px", color: "var(--text-secondary)" }}>
+                                <p style={{ margin: "2px 0 0 0", fontSize: "12px", color: "#94a3b8" }}>
                                     {currentCap.tagline}
                                 </p>
                             </div>
-                            <span style={{ fontSize: "11px", background: "var(--primary-color)", color: "#ffffff", padding: "3px 10px", borderRadius: "6px", fontWeight: 700 }}>
-                                {currentCap.functions.length} SPECIALIZED AI FUNCTIONS
+                            <span style={{ fontSize: "10px", background: "rgba(212, 175, 55, 0.2)", color: "#d4af37", border: "1px solid rgba(212, 175, 55, 0.4)", padding: "3px 10px", borderRadius: "8px", fontWeight: 700 }}>
+                                {currentCap.functions.length} AI SPECIALIZED FUNCTIONS
                             </span>
                         </div>
 
-                        {/* Functions List Grid */}
-                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "12px" }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "10px" }}>
                             {currentCap.functions.map((fn) => (
                                 <div
                                     key={fn.id}
                                     style={{
                                         padding: "12px 14px",
-                                        background: "var(--card-bg)",
+                                        background: "rgba(255, 255, 255, 0.03)",
                                         borderRadius: "8px",
-                                        border: "1px solid var(--border-color)",
+                                        border: "1px solid rgba(255, 255, 255, 0.06)",
                                         display: "flex",
                                         alignItems: "flex-start",
                                         gap: "10px",
@@ -317,8 +341,8 @@ export default function EnvironmentSelectPage({ user, onEnvironmentSelected }) {
                                 >
                                     <span style={{ fontSize: "20px" }}>{fn.icon}</span>
                                     <div>
-                                        <div style={{ fontSize: "12px", fontWeight: 700, color: "var(--text-primary)" }}>{fn.name}</div>
-                                        <div style={{ fontSize: "11px", color: "var(--text-secondary)", marginTop: "2px" }}>{fn.desc}</div>
+                                        <div style={{ fontSize: "12px", fontWeight: 700, color: "#f8fafc" }}>{fn.name}</div>
+                                        <div style={{ fontSize: "11px", color: "#94a3b8", marginTop: "2px" }}>{fn.desc}</div>
                                     </div>
                                 </div>
                             ))}
@@ -326,121 +350,108 @@ export default function EnvironmentSelectPage({ user, onEnvironmentSelected }) {
                     </div>
                 )}
 
-                {/* Action Buttons: Guided Setup vs Direct Enter */}
-                <div style={{ display: "flex", justifyContent: "flex-end", gap: "14px", borderTop: "1px solid var(--border-color)", paddingTop: "20px" }}>
+                {/* Section 3: Action Controls */}
+                <div style={{ display: "flex", justifyContent: "flex-end", gap: "14px", borderTop: "1px solid rgba(255, 255, 255, 0.08)", paddingTop: "20px" }}>
                     <button
                         type="button"
+                        onClick={() => handleDirectEnter()}
                         className="tool-btn btn-secondary-mini"
-                        onClick={handleDirectEnter}
-                        style={{ padding: "10px 22px", fontSize: "13px", fontWeight: 600 }}
+                        style={{ padding: "10px 22px", fontSize: "13px", color: "#cbd5e1", border: "1px solid rgba(255,255,255,0.15)", background: "rgba(255,255,255,0.04)" }}
                     >
-                        ⚡ Enter Direct Command Center
+                        ⚡ Direct Command Center
                     </button>
                     <button
                         type="button"
-                        className="tool-btn btn-primary"
-                        onClick={() => setShowWizardModal(true)}
+                        onClick={() => setShowOnboardingModal(true)}
                         style={{
                             padding: "10px 28px",
                             fontSize: "13px",
                             fontWeight: 700,
-                            background: "linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)",
-                            boxShadow: "0 2px 8px rgba(14,165,233,0.3)",
+                            background: "linear-gradient(135deg, #d4af37 0%, #b8860b 100%)",
+                            color: "#0c1017",
+                            border: "none",
+                            borderRadius: "6px",
+                            cursor: "pointer",
+                            boxShadow: "0 4px 16px rgba(212, 175, 55, 0.35)",
                         }}
                     >
-                        🚀 Start Guided Setup Flow (Enroll People &amp; Camera)
+                        🚀 Initialize Mode &amp; Dataset (Guided Setup)
                     </button>
                 </div>
             </div>
 
-            {/* Guided Setup Wizard Modal (Step 1 to 5) */}
-            <SetupWizardModal
+            {/* Step-by-Step Onboarding Wizard Modal */}
+            <OnboardingFlowModal
                 environment={selectedEnv}
-                isOpen={showWizardModal}
-                onClose={() => setShowWizardModal(false)}
-                onComplete={() => handleDirectEnter()}
+                isOpen={showOnboardingModal}
+                onClose={() => setShowOnboardingModal(false)}
+                onLaunchLive={(config) => handleDirectEnter()}
             />
 
             {/* Rename Modal */}
             {editingEnv && (
                 <div className="modal-overlay">
-                    <div className="modal-dialog">
+                    <div className="modal-dialog" style={{ background: "#0e131b", border: "1px solid rgba(212, 175, 55, 0.3)" }}>
                         <div className="modal-header">
-                            <h3>✏️ Rename Deployment Mode</h3>
+                            <h3 style={{ color: "#f8fafc" }}>✏️ Rename Deployment Mode</h3>
                             <button className="tool-btn btn-secondary-mini" onClick={() => setEditingEnv(null)}>✕</button>
                         </div>
                         <form onSubmit={handleSaveEnvRename} className="modal-form">
                             <div>
-                                <label className="fleet-stat-label">Mode Name</label>
+                                <label style={{ fontSize: "11px", color: "#94a3b8" }}>Mode Name</label>
                                 <input
                                     className="form-control"
                                     value={editName}
                                     onChange={(e) => setEditName(e.target.value)}
-                                    style={{ width: "100%", padding: "8px 12px", fontSize: "13px" }}
+                                    style={{ width: "100%", padding: "8px 12px", fontSize: "13px", background: "#131a26", color: "#ffffff", border: "1px solid rgba(255,255,255,0.1)" }}
                                 />
-                            </div>
-                            <div>
-                                <label className="fleet-stat-label">Domain Category</label>
-                                <select
-                                    className="sector-select-box"
-                                    value={editType}
-                                    onChange={(e) => setEditType(e.target.value)}
-                                    style={{ width: "100%", padding: "8px 12px", fontSize: "13px" }}
-                                >
-                                    <option value="School">School / Campus</option>
-                                    <option value="Military">Military / Strategic Defense</option>
-                                    <option value="Industry">Heavy Industry &amp; Plants</option>
-                                    <option value="Hospital">Hospital &amp; Public Transit</option>
-                                    <option value="Corporate">Corporate Campus</option>
-                                </select>
                             </div>
                             <div className="modal-actions">
                                 <button type="button" className="tool-btn btn-secondary-mini" onClick={() => setEditingEnv(null)}>Cancel</button>
-                                <button type="submit" className="tool-btn btn-primary">Save Changes</button>
+                                <button type="submit" className="tool-btn btn-primary" style={{ background: "#d4af37", color: "#0c1017" }}>Save Changes</button>
                             </div>
                         </form>
                     </div>
                 </div>
             )}
 
-            {/* Create New Mode Modal */}
+            {/* Create Custom Mode Modal */}
             {showCreateModal && (
                 <div className="modal-overlay">
-                    <div className="modal-dialog">
+                    <div className="modal-dialog" style={{ background: "#0e131b", border: "1px solid rgba(212, 175, 55, 0.3)" }}>
                         <div className="modal-header">
-                            <h3>➕ Add Custom Operational Mode</h3>
+                            <h3 style={{ color: "#f8fafc" }}>➕ Add Custom Operational Domain</h3>
                             <button className="tool-btn btn-secondary-mini" onClick={() => setShowCreateModal(false)}>✕</button>
                         </div>
                         <form onSubmit={handleCreateNew} className="modal-form">
                             <div>
-                                <label className="fleet-stat-label">Mode Name *</label>
+                                <label style={{ fontSize: "11px", color: "#94a3b8" }}>Mode Name *</label>
                                 <input
                                     className="form-control"
                                     value={newName}
                                     onChange={(e) => setNewName(e.target.value)}
-                                    placeholder="e.g. Apex Strategic Research Compound"
+                                    placeholder="e.g. Apex Strategic Compound"
                                     required
-                                    style={{ width: "100%", padding: "8px 12px", fontSize: "13px" }}
+                                    style={{ width: "100%", padding: "8px 12px", fontSize: "13px", background: "#131a26", color: "#ffffff", border: "1px solid rgba(255,255,255,0.1)" }}
                                 />
                             </div>
                             <div>
-                                <label className="fleet-stat-label">Domain Classification</label>
+                                <label style={{ fontSize: "11px", color: "#94a3b8" }}>Domain Category</label>
                                 <select
-                                    className="sector-select-box"
                                     value={newType}
                                     onChange={(e) => setNewType(e.target.value)}
-                                    style={{ width: "100%", padding: "8px 12px", fontSize: "13px" }}
+                                    style={{ width: "100%", padding: "8px 12px", fontSize: "13px", background: "#131a26", color: "#ffffff", border: "1px solid rgba(255,255,255,0.1)" }}
                                 >
                                     <option value="School">School / Campus</option>
                                     <option value="Military">Military / Defense</option>
                                     <option value="Industry">Industry &amp; Manufacturing</option>
-                                    <option value="Hospital">Hospital / Healthcare</option>
+                                    <option value="Hospital">Hospital / Public Places</option>
                                     <option value="Corporate">Corporate Tech Hub</option>
                                 </select>
                             </div>
                             <div className="modal-actions">
                                 <button type="button" className="tool-btn btn-secondary-mini" onClick={() => setShowCreateModal(false)}>Cancel</button>
-                                <button type="submit" className="tool-btn btn-primary">Create Mode</button>
+                                <button type="submit" className="tool-btn btn-primary" style={{ background: "#d4af37", color: "#0c1017" }}>Create Mode</button>
                             </div>
                         </form>
                     </div>

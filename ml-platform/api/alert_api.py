@@ -288,6 +288,8 @@ def update_alert_status(
         "ACTIVE",
         "RESOLVED",
         "DISMISSED",
+        "CONFIRMED_VIOLATION",
+        "FALSE_ALARM",
     }
 
     status = status.upper()
