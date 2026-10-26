@@ -14,7 +14,7 @@ from api.notification_api import router as notification_router
 from api.realtime import router as realtime_router
 from api.statistics_api import router as statistics_router
 
-# Newly added master modules
+# Core Operational Modules
 from api.auth_api import router as auth_router
 from api.environment_api import router as environment_router
 from api.people_api import router as people_router
@@ -22,6 +22,7 @@ from api.attendance_api import router as attendance_router
 from api.rules_api import router as rules_router
 from api.assistant_api import router as assistant_router
 from api.vision_search_api import router as vision_search_router
+from api.ai_brain_api import router as ai_brain_router
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -49,6 +50,7 @@ app.include_router(attendance_router)
 app.include_router(rules_router)
 app.include_router(assistant_router)
 app.include_router(vision_search_router)
+app.include_router(ai_brain_router)
 
 # Analytics, Health & Monitoring Routers
 app.include_router(alert_router)

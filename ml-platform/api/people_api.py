@@ -3,7 +3,8 @@ import sqlite3
 import datetime
 from pathlib import Path
 from typing import Optional, List
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Response
+from api.dossier_manager import get_person_dossier, generate_and_save_dossier
 from pydantic import BaseModel
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -46,6 +47,11 @@ class UpdatePersonRequest(BaseModel):
     phone: Optional[str] = None
     email: Optional[str] = None
     photo_url: Optional[str] = None
+
+
+class BatchCreatePeopleRequest(BaseModel):
+    people: List[CreatePersonRequest]
+    environment_id: Optional[int] = 1
 
 
 class EnrollFaceRequest(BaseModel):
@@ -397,3 +403,91 @@ def delete_person(person_id: int):
         return {"success": True, "message": "Person deleted successfully"}
     finally:
         conn.close()
+
+
+@router.post("/batch")
+def create_people_batch(req: BatchCreatePeopleRequest):
+    conn = get_connection()
+    try:
+        created = []
+        for p in req.people:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                INSERT OR REPLACE INTO people (name, identifier, role, department, class_grade, allowed_dress, phone, email, photo_url, environment_id, is_enrolled, status)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 'active')
+            """,
+                (
+                    p.name,
+                    p.identifier,
+                    p.role,
+                    p.department,
+                    p.class_grade,
+                    p.allowed_dress,
+                    p.phone,
+                    p.email,
+                    p.photo_url,
+                    p.environment_id or req.environment_id or 1,
+                ),
+            )
+            pid = cursor.lastrowid
+            created.append({"id": pid, "name": p.name, "identifier": p.identifier})
+            try:
+                generate_and_save_dossier(pid, conn)
+            except Exception as e:
+                print(f"Could not auto-generate dossier for {pid}: {e}")
+        conn.commit()
+        return {
+            "success": True,
+            "count": len(created),
+            "people": created,
+            "message": f"Successfully enrolled {len(created)} personnel profiles",
+        }
+    finally:
+        conn.close()
+
+
+@router.delete("/environment/{env_id}/clear")
+def clear_environment_people(env_id: int):
+    conn = get_connection()
+    try:
+        conn.execute(
+            "DELETE FROM face_embeddings WHERE person_id IN (SELECT id FROM people WHERE environment_id = ?)",
+            (env_id,),
+        )
+        conn.execute(
+            "DELETE FROM attendance_records WHERE person_id IN (SELECT id FROM people WHERE environment_id = ?)",
+            (env_id,),
+        )
+        conn.execute("DELETE FROM people WHERE environment_id = ?", (env_id,))
+        conn.commit()
+        return {
+            "success": True,
+            "message": f"Cleared personnel for environment #{env_id}",
+        }
+    finally:
+        conn.close()
+
+
+@router.get("/{person_id}/dossier")
+def get_dossier_data(person_id: int):
+    dossier = get_person_dossier(person_id)
+    if "error" in dossier:
+        raise HTTPException(status_code=404, detail=dossier["error"])
+    return dossier
+
+
+@router.get("/{person_id}/dossier/markdown")
+def get_dossier_markdown(person_id: int):
+    dossier = get_person_dossier(person_id)
+    if "error" in dossier:
+        raise HTTPException(status_code=404, detail=dossier["error"])
+    md_path = dossier.get("md_path")
+    if md_path and Path(md_path).exists():
+        with open(md_path, "r", encoding="utf-8") as f:
+            content = f.read()
+        return Response(content=content, media_type="text/markdown")
+    return Response(
+        content=f"# Dossier for {dossier.get('dossier_title')}",
+        media_type="text/markdown",
+    )

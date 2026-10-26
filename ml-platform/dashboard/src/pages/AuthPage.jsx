@@ -15,8 +15,9 @@ export default function AuthPage({ onAuthenticated }) {
     const [identifier, setIdentifier] = useState("");
     const [password, setPassword]     = useState("");
 
-    // Register fields
+    // Register fields: ID, Name, Phone, Email, Password (NO OTP)
     const [regUsername, setRegUsername] = useState("");
+    const [regName,     setRegName]     = useState("");
     const [regPhone,    setRegPhone]    = useState("");
     const [regEmail,    setRegEmail]    = useState("");
     const [regPassword, setRegPassword] = useState("");
@@ -52,18 +53,19 @@ export default function AuthPage({ onAuthenticated }) {
         }
     };
 
-    // ── Register ───────────────────────────────────────────────────────────
+    // ── Register (No OTP) ───────────────────────────────────────────────────
     const handleRegister = async (e) => {
         e.preventDefault();
         setError("");
-        if (!regUsername || !regPhone || !regEmail || !regPassword) {
-            setError("All fields are required");
+        if (!regUsername || !regName || !regPhone || !regEmail || !regPassword) {
+            setError("All fields (User ID, Full Name, Phone, Email, and Password) are required.");
             return;
         }
         setLoading(true);
         try {
             const res = await registerUser({
                 username: regUsername,
+                name:     regName,
                 phone:    regPhone,
                 email:    regEmail,
                 password: regPassword,
@@ -79,14 +81,13 @@ export default function AuthPage({ onAuthenticated }) {
         } catch (err) {
             setError(
                 err.response?.data?.detail ||
-                "Registration failed. Username, email or phone may already be taken."
+                "Registration failed. Username, email or phone may already be registered."
             );
         } finally {
             setLoading(false);
         }
     };
 
-    // ── UI ─────────────────────────────────────────────────────────────────
     return (
         <div className="auth-container">
             <div className="auth-card">
@@ -97,10 +98,10 @@ export default function AuthPage({ onAuthenticated }) {
                         <div className="inner-radar"></div>
                     </div>
                     <h1>SENTRONIX AI</h1>
-                    <p>Intelligent Surveillance &amp; Safety Operations Platform</p>
+                    <p>Intelligent 24/7 Surveillance &amp; Safety Platform</p>
                 </div>
 
-                {/* Tabs */}
+                {/* Tab Switcher */}
                 <div className="auth-tabs-row">
                     <button
                         type="button"
@@ -114,20 +115,26 @@ export default function AuthPage({ onAuthenticated }) {
                         className={`auth-tab-btn ${mode === "register" ? "active" : ""}`}
                         onClick={() => { setMode("register"); setError(""); }}
                     >
-                        Create Account
+                        Register New User
                     </button>
                 </div>
 
-                {error && <div className="auth-alert error">{error}</div>}
+                {/* Error Banner */}
+                {error && (
+                    <div className="auth-alert error">
+                        <span>⚠️</span>
+                        <span>{error}</span>
+                    </div>
+                )}
 
                 {/* ─── LOGIN FORM ─────────────────────────────────────────── */}
                 {mode === "login" && (
                     <form onSubmit={handleLogin} className="auth-form">
                         <div className="form-group">
-                            <label>User ID, Email, or Phone Number</label>
+                            <label>User ID, Email, or Phone</label>
                             <input
                                 type="text"
-                                placeholder="admin  /  user@email.com  /  +91 98765 43210"
+                                placeholder="e.g. admin or 9876543210"
                                 value={identifier}
                                 onChange={(e) => setIdentifier(e.target.value)}
                                 required
@@ -147,19 +154,22 @@ export default function AuthPage({ onAuthenticated }) {
                         </div>
 
                         <button type="submit" className="auth-submit-btn" disabled={loading}>
-                            {loading ? "Authenticating..." : "Sign In →"}
+                            {loading ? "Authenticating..." : "Sign In to Platform →"}
                         </button>
 
-                        {/* Demo quick-login buttons */}
+                        {/* Quick Demo Profiles */}
                         <div className="demo-profiles-row">
-                            <span className="demo-label">Quick Demo:</span>
+                            <span className="demo-label">Quick fill:</span>
                             {DEMO_PROFILES.map((p) => (
                                 <button
                                     key={p.label}
                                     type="button"
                                     className="demo-btn"
-                                    onClick={() => handleLogin(null, p.identifier, p.password)}
-                                    disabled={loading}
+                                    onClick={() => {
+                                        setIdentifier(p.identifier);
+                                        setPassword(p.password);
+                                        handleLogin(null, p.identifier, p.password);
+                                    }}
                                 >
                                     {p.label}
                                 </button>
@@ -175,14 +185,14 @@ export default function AuthPage({ onAuthenticated }) {
                     </form>
                 )}
 
-                {/* ─── REGISTER FORM ──────────────────────────────────────── */}
+                {/* ─── REGISTER FORM (NO OTP REQUIRED) ──────────────────────── */}
                 {mode === "register" && (
                     <form onSubmit={handleRegister} className="auth-form">
                         <div className="form-group">
-                            <label>User ID (Username)</label>
+                            <label>User ID (Username) *</label>
                             <input
                                 type="text"
-                                placeholder="e.g. guard_01 or john_smith"
+                                placeholder="e.g. officer_01 or pravin"
                                 value={regUsername}
                                 onChange={(e) => setRegUsername(e.target.value)}
                                 required
@@ -191,7 +201,18 @@ export default function AuthPage({ onAuthenticated }) {
                         </div>
 
                         <div className="form-group">
-                            <label>Phone Number</label>
+                            <label>Full Name *</label>
+                            <input
+                                type="text"
+                                placeholder="e.g. Commander Pravin"
+                                value={regName}
+                                onChange={(e) => setRegName(e.target.value)}
+                                required
+                            />
+                        </div>
+
+                        <div className="form-group">
+                            <label>Phone Number *</label>
                             <input
                                 type="tel"
                                 placeholder="+91 98765 43210"
@@ -202,13 +223,25 @@ export default function AuthPage({ onAuthenticated }) {
                         </div>
 
                         <div className="form-group">
-                            <label>Email Address</label>
+                            <label>Email Address *</label>
                             <input
                                 type="email"
                                 placeholder="officer@sentronix.ai"
                                 value={regEmail}
                                 onChange={(e) => setRegEmail(e.target.value)}
                                 required
+                            />
+                        </div>
+
+                        <div className="form-group">
+                            <label>Password *</label>
+                            <input
+                                type="password"
+                                placeholder="••••••••"
+                                value={regPassword}
+                                onChange={(e) => setRegPassword(e.target.value)}
+                                required
+                                minLength={4}
                             />
                         </div>
 
@@ -222,20 +255,8 @@ export default function AuthPage({ onAuthenticated }) {
                             </select>
                         </div>
 
-                        <div className="form-group">
-                            <label>Password</label>
-                            <input
-                                type="password"
-                                placeholder="••••••••"
-                                value={regPassword}
-                                onChange={(e) => setRegPassword(e.target.value)}
-                                required
-                                minLength={4}
-                            />
-                        </div>
-
                         <button type="submit" className="auth-submit-btn" disabled={loading}>
-                            {loading ? "Creating Account..." : "Create Account & Enter →"}
+                            {loading ? "Creating Account..." : "Create Account & Enter Platform →"}
                         </button>
 
                         <div className="auth-footer-toggle">

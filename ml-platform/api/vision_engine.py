@@ -7,6 +7,8 @@ import numpy as np
 from datetime import datetime, date
 from pathlib import Path
 from typing import Dict, Optional
+from api.ai_brain_api import record_ai_event
+from api.dossier_manager import generate_and_save_dossier
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 PROJECT_ROOT = BASE_DIR.parent
@@ -170,6 +172,14 @@ def process_frame(
                                 (person_id, camera_id, now_str, status),
                             )
                             conn.commit()
+                            try:
+                                record_ai_event(
+                                    "ATTENDANCE",
+                                    f"Automated check-in verified for {matched_person['name']} ({matched_person.get('identifier', 'ID')}) as {status}.",
+                                )
+                                generate_and_save_dossier(person_id, conn)
+                            except Exception:
+                                pass
 
             # B. DRESS_CODE / DRESS_CODE_PPE: Formals & Regular School Dress Policy
             elif func_upper in ["DRESS_CODE", "DRESS_CODE_PPE"]:

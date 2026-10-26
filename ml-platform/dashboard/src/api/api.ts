@@ -33,8 +33,10 @@ API.interceptors.request.use((config) => {
 export interface User {
     id: number;
     username: string;
-    full_name: string;
+    full_name?: string;
+    name?: string;
     email: string;
+    phone?: string;
     role: string;
     is_verified?: boolean;
 }
@@ -99,16 +101,6 @@ export interface AttendanceRecord {
     camera_name?: string;
 }
 
-export interface Rule {
-    id: number;
-    name: string;
-    rule_type: string;
-    conditions: Record<string, any>;
-    severity: string;
-    cooldown_seconds: number;
-    is_enabled: number;
-}
-
 export interface Alert {
     id: number;
     timestamp: string;
@@ -116,43 +108,68 @@ export interface Alert {
     priority: string;
     confidence: number;
     status: string;
-    camera_id?: string;
+    camera_id: number;
+    snapshot_url?: string;
 }
 
-export interface Detection {
-    id: number;
-    timestamp: string;
-    camera_id: string;
-    object: string;
-    confidence: number;
-    bbox: string;
-}
-
-// ==========================================
-// API FUNCTIONS
-// ==========================================
-
-export const loginUser = async (data: any) => {
+// ── Auth Endpoints ─────────────────────────────────────────────────────────
+export const loginUser = async (data: { identifier: string; password: string }) => {
     const res = await API.post("/auth/login", data);
     return res.data;
 };
 
-export const registerUser = async (data: any) => {
+export const registerUser = async (data: {
+    username: string;
+    name?: string;
+    phone: string;
+    email: string;
+    password: string;
+    role?: string;
+}) => {
     const res = await API.post("/auth/register", data);
     return res.data;
 };
 
+export const changeUserPassword = async (data: {
+    identifier: string;
+    old_password: string;
+    new_password: string;
+}) => {
+    const res = await API.post("/auth/change-password", data);
+    return res.data;
+};
+
+export const updateUserProfile = async (data: {
+    identifier: string;
+    name?: string;
+    email?: string;
+    phone?: string;
+}) => {
+    const res = await API.patch("/auth/profile", data);
+    return res.data;
+};
+
+// ── Environments / Operational Modes ─────────────────────────────────────────
 export const getEnvironments = async () => {
     const res = await API.get("/environments");
     return res.data;
 };
 
-export const createEnvironment = async (data: any) => {
+export const createEnvironment = async (data: {
+    name: string;
+    type: string;
+    description?: string;
+    location?: string;
+    enabled_features: string[];
+}) => {
     const res = await API.post("/environments", data);
     return res.data;
 };
 
-export const updateEnvironment = async (envId: number, data: { name?: string; type?: string; description?: string; location?: string }) => {
+export const updateEnvironment = async (
+    envId: number,
+    data: { name?: string; type?: string; description?: string; location?: string }
+) => {
     const res = await API.patch(`/environments/${envId}`, data);
     return res.data;
 };
@@ -162,8 +179,14 @@ export const updateEnvironmentFeatures = async (envId: number, features: string[
     return res.data;
 };
 
-export const getCameras = async (params: any = {}) => {
+// ── Cameras & Streaming ───────────────────────────────────────────────────
+export const getCameras = async (params: { limit?: number; group_id?: number; search?: string } = {}) => {
     const res = await API.get("/cameras", { params });
+    return res.data;
+};
+
+export const getCamera = async (cameraId: number | string) => {
+    const res = await API.get(`/cameras/${cameraId}`);
     return res.data;
 };
 
@@ -172,8 +195,13 @@ export const createCamera = async (data: any) => {
     return res.data;
 };
 
+export const updateCamera = async (cameraId: number | string, data: any) => {
+    const res = await API.patch(`/cameras/${cameraId}`, data);
+    return res.data;
+};
+
 export const assignCameraFunction = async (cameraId: number | string, assigned_function: string) => {
-    const res = await API.patch(`/cameras/${cameraId}/function`, { assigned_function });
+    const res = await API.patch(`/cameras/${cameraId}/function`, null, { params: { assigned_function } });
     return res.data;
 };
 
@@ -195,6 +223,7 @@ export const getCameraFunctions = async () => {
     return res.data;
 };
 
+// ── People, Biometrics & Dossiers ──────────────────────────────────────────
 export const getPeople = async (role?: string) => {
     const res = await API.get("/people", { params: { role } });
     return res.data;
@@ -210,6 +239,16 @@ export const createPerson = async (data: any) => {
     return res.data;
 };
 
+export const createPeopleBatch = async (people: any[], environment_id: number = 1) => {
+    const res = await API.post("/people/batch", { people, environment_id });
+    return res.data;
+};
+
+export const clearEnvironmentPeople = async (environment_id: number) => {
+    const res = await API.delete(`/people/environment/${environment_id}/clear`);
+    return res.data;
+};
+
 export const updatePerson = async (personId: number, data: any) => {
     const res = await API.patch(`/people/${personId}`, data);
     return res.data;
@@ -217,6 +256,16 @@ export const updatePerson = async (personId: number, data: any) => {
 
 export const getPersonHistory = async (personId: number) => {
     const res = await API.get(`/people/${personId}/history`);
+    return res.data;
+};
+
+export const getPersonDossier = async (personId: number) => {
+    const res = await API.get(`/people/${personId}/dossier`);
+    return res.data;
+};
+
+export const getPersonDossierMarkdown = async (personId: number) => {
+    const res = await API.get(`/people/${personId}/dossier/markdown`, { responseType: "text" });
     return res.data;
 };
 
@@ -235,6 +284,43 @@ export const enrollPersonFace = async (personId: number, data: any = {}) => {
     return res.data;
 };
 
+// ── JARVIS 24/7 AI Main Brain & Daily Logs ─────────────────────────────────
+export const getAIBrainStatus = async () => {
+    const res = await API.get("/ai-brain/status");
+    return res.data;
+};
+
+export const updateAIBrainConfig = async (config: {
+    name?: string;
+    speed_mode?: string;
+    autonomy_level?: string;
+    voice_announcements?: boolean;
+}) => {
+    const res = await API.post("/ai-brain/config", config);
+    return res.data;
+};
+
+export const getAIDailyLog = async () => {
+    const res = await API.get("/ai-brain/daily-log");
+    return res.data;
+};
+
+export const getAIDailyLogMarkdown = async () => {
+    const res = await API.get("/ai-brain/daily-log/markdown", { responseType: "text" });
+    return res.data;
+};
+
+export const getAIActions = async (limit: number = 30) => {
+    const res = await API.get("/ai-brain/actions", { params: { limit } });
+    return res.data;
+};
+
+export const logAIAction = async (data: { module: string; action: string; severity?: string }) => {
+    const res = await API.post("/ai-brain/action", data);
+    return res.data;
+};
+
+// ── Attendance, Rules & Alerts ─────────────────────────────────────────────
 export const getAttendance = async (date?: string) => {
     const res = await API.get("/attendance", { params: { attendance_date: date } });
     return res.data;

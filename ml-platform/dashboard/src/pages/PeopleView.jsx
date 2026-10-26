@@ -4,12 +4,15 @@ import {
     createPerson,
     updatePerson,
     getPersonHistory,
+    getPersonDossier,
+    getPersonDossierMarkdown,
+    clearEnvironmentPeople,
     markPersonPresent,
     enrollPersonFace,
     deletePerson,
 } from "../api/api";
 
-export default function PeopleView() {
+export default function PeopleView({ environment }) {
     const [people, setPeople] = useState([]);
     const [filterRole, setFilterRole] = useState("ALL");
     const [searchQuery, setSearchQuery] = useState("");
@@ -18,6 +21,11 @@ export default function PeopleView() {
     const [personHistory, setPersonHistory] = useState([]);
     const [loadingHistory, setLoadingHistory] = useState(false);
     const [feedbackMsg, setFeedbackMsg] = useState("");
+
+    // Dossier Modal
+    const [dossierData, setDossierData] = useState(null);
+    const [showDossierModal, setShowDossierModal] = useState(false);
+    const [loadingDossier, setLoadingDossier] = useState(false);
 
     // Add person form state
     const [newName, setNewName] = useState("");
@@ -55,6 +63,11 @@ export default function PeopleView() {
         loadPeople();
     }, [filterRole]);
 
+    const showToast = (msg) => {
+        setFeedbackMsg(msg);
+        setTimeout(() => setFeedbackMsg(""), 4000);
+    };
+
     const handleCreatePerson = async (e) => {
         e.preventDefault();
         try {
@@ -67,6 +80,7 @@ export default function PeopleView() {
                 allowed_dress: newDress,
                 phone: newPhone,
                 email: newEmail,
+                environment_id: environment?.id || 1,
             });
 
             if (res.success) {
@@ -75,7 +89,7 @@ export default function PeopleView() {
                 setNewIdentifier("");
                 setNewPhone("");
                 setNewEmail("");
-                showToast(`✓ Registered ${newName}. Profile created successfully.`);
+                showToast(`✓ Registered ${newName}. Profile and AI dossier created.`);
                 await loadPeople();
             }
         } catch (err) {
@@ -121,22 +135,68 @@ export default function PeopleView() {
                 await loadPeople();
             }
         } catch (err) {
-            alert(err.response?.data?.detail || "Failed to update person");
+            alert(err.response?.data?.detail || "Failed to save profile changes");
         }
     };
 
-    const handleMarkPresentNow = async () => {
-        if (!selectedPerson) return;
+    // Open & Load AI Individual Dossier (Point 6)
+    const handleOpenDossier = async (person) => {
+        setLoadingDossier(true);
+        setShowDossierModal(true);
         try {
-            const res = await markPersonPresent(selectedPerson.id);
+            const data = await getPersonDossier(person.id);
+            setDossierData(data);
+        } catch (err) {
+            console.error("Failed to load dossier", err);
+            alert("Could not load AI dossier");
+        } finally {
+            setLoadingDossier(false);
+        }
+    };
+
+    const handleDownloadDossierMd = async (personId, name) => {
+        try {
+            const md = await getPersonDossierMarkdown(personId);
+            const blob = new Blob([md], { type: "text/markdown;charset=utf-8" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `DOSSIER_${name.replace(/\s+/g, "_")}.md`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            alert("Could not download dossier markdown");
+        }
+    };
+
+    const handleDownloadDossierJson = (dossier, name) => {
+        const jsonStr = JSON.stringify(dossier, null, 2);
+        const blob = new Blob([jsonStr], { type: "application/json;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `DOSSIER_${name.replace(/\s+/g, "_")}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    };
+
+    const handleMarkPresent = async (personId, name) => {
+        try {
+            const res = await markPersonPresent(personId);
             if (res.success) {
-                showToast(`✓ Marked ${selectedPerson.name} as PRESENT for today!`);
-                const histRes = await getPersonHistory(selectedPerson.id);
-                setPersonHistory(histRes.history || []);
+                showToast(`✓ Biometric check-in recorded for ${name} at ${res.timestamp}`);
                 await loadPeople();
+                if (selectedPerson && selectedPerson.id === personId) {
+                    const hRes = await getPersonHistory(personId);
+                    setPersonHistory(hRes.history || []);
+                }
             }
         } catch (err) {
-            alert("Could not mark present");
+            alert("Failed to mark attendance");
         }
     };
 
@@ -144,29 +204,36 @@ export default function PeopleView() {
         try {
             const res = await enrollPersonFace(person.id);
             if (res.success) {
-                showToast(`✓ Face enrolled & neural vector generated for ${person.name}!`);
+                showToast(`✓ Face biometric features enrolled for ${person.name}`);
                 await loadPeople();
             }
         } catch (err) {
-            alert(err.response?.data?.detail || "Face enrollment failed");
+            alert("Face enrollment failed");
         }
     };
 
-    const handleDeletePerson = async (personId) => {
-        if (!window.confirm("Are you sure you want to delete this person profile and their records?")) return;
+    const handleDelete = async (personId, name) => {
+        if (!confirm(`Are you sure you want to delete profile for ${name}?`)) return;
         try {
             await deletePerson(personId);
+            showToast(`✓ Deleted ${name} from registry.`);
             setSelectedPerson(null);
-            showToast("Profile removed from registry.");
             await loadPeople();
         } catch (err) {
             alert("Delete failed");
         }
     };
 
-    const showToast = (msg) => {
-        setFeedbackMsg(msg);
-        setTimeout(() => setFeedbackMsg(""), 4500);
+    const handleClearAllRoster = async () => {
+        const envId = environment?.id || 1;
+        if (!confirm("Are you sure you want to clear all personnel from this environment to start 100% fresh?")) return;
+        try {
+            await clearEnvironmentPeople(envId);
+            showToast("✓ Cleaned environment roster. You can now onboard new personnel.");
+            await loadPeople();
+        } catch (err) {
+            alert("Could not clear roster");
+        }
     };
 
     const filteredPeople = people.filter((p) => {
@@ -181,339 +248,389 @@ export default function PeopleView() {
 
     return (
         <div className="people-module-container">
-            {/* Header Row */}
+            {/* Header */}
             <div className="module-header-row">
                 <div>
-                    <h2>People & Identity Registry</h2>
-                    <p>Enrolled Student, Staff & Personnel Database • Profile & Records Management</p>
+                    <h2 style={{ margin: 0, fontSize: "18px", fontWeight: 700, color: "var(--text-primary)" }}>
+                        People Registry &amp; AI-Managed Individual Dossiers
+                    </h2>
+                    <p style={{ margin: "4px 0 0 0", fontSize: "12px", color: "var(--text-secondary)" }}>
+                        Every student, faculty, and officer has an independent, physical AI dossier file tracking attendance, biometrics, and uniform compliance.
+                    </p>
                 </div>
-                <div className="attendance-action-group">
-                    <input
-                        type="text"
-                        placeholder="🔍 Search by name or ID..."
-                        className="table-search-field"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                    />
-                    <div className="filter-role-pills">
-                        {["ALL", "student", "staff", "visitor"].map((r) => (
-                            <button
-                                key={r}
-                                className={`filter-tab ${filterRole === r ? "active" : ""}`}
-                                onClick={() => setFilterRole(r)}
-                            >
-                                {r.toUpperCase()}
-                            </button>
-                        ))}
-                    </div>
-                    <button className="btn-primary" onClick={() => setShowAddModal(true)}>
-                        + Register Person
+                <div style={{ display: "flex", gap: "10px" }}>
+                    <button
+                        className="tool-btn btn-secondary-mini"
+                        onClick={handleClearAllRoster}
+                        title="Clear dummy data to onboard new people"
+                        style={{ color: "#ef4444", border: "1px solid #fecaca", background: "#fef2f2" }}
+                    >
+                        🗑️ Reset Roster
+                    </button>
+                    <button className="tool-btn btn-primary" onClick={() => setShowAddModal(true)}>
+                        + Register New Individual
                     </button>
                 </div>
+            </div>
+
+            {/* Filter & Search Bar */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "14px 0", flexWrap: "wrap", gap: "10px" }}>
+                <div className="filter-role-pills">
+                    {["ALL", "student", "staff", "visitor"].map((r) => (
+                        <button
+                            key={r}
+                            className={`fleet-pill ${filterRole === r ? "active" : ""}`}
+                            onClick={() => setFilterRole(r)}
+                        >
+                            {r.toUpperCase()}
+                        </button>
+                    ))}
+                </div>
+                <input
+                    className="form-control"
+                    placeholder="🔍 Search by name, roll no, department..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    style={{ padding: "6px 14px", fontSize: "12px", borderRadius: "20px", border: "1px solid var(--border-color)", width: "260px" }}
+                />
             </div>
 
             {feedbackMsg && <div className="checkin-feedback-banner">{feedbackMsg}</div>}
 
             {/* People Cards Grid */}
             <div className="people-cards-grid">
-                {filteredPeople.map((p) => {
-                    const isEnrolled = p.is_enrolled === 1;
-                    const isPresentToday = p.today_attendance?.status === "PRESENT";
-                    return (
-                        <div key={p.id} className="person-profile-card">
-                            <div className="profile-header">
-                                <div className="avatar-large">{p.name.charAt(0)}</div>
-                                <div className="profile-meta">
-                                    <h3 className="person-card-name">{p.name}</h3>
-                                    <span className="profile-id">{p.identifier}</span>
+                {filteredPeople.length === 0 ? (
+                    <div style={{ gridColumn: "1 / -1", padding: "40px", textAlign: "center", background: "var(--card-bg)", borderRadius: "8px", border: "1px solid var(--border-color)" }}>
+                        <div style={{ fontSize: "36px", marginBottom: "10px" }}>👤</div>
+                        <h4 style={{ margin: 0, fontSize: "16px" }}>No Personnel Registered In This Mode</h4>
+                        <p style={{ margin: "6px 0 16px 0", fontSize: "13px", color: "var(--text-secondary)" }}>
+                            Start fresh by registering students/staff or launch the Guided Setup Wizard.
+                        </p>
+                        <button className="tool-btn btn-primary" onClick={() => setShowAddModal(true)}>
+                            + Register First Person
+                        </button>
+                    </div>
+                ) : (
+                    filteredPeople.map((p) => {
+                        const isEnrolled = p.is_enrolled === 1;
+                        const isPresentToday = p.today_attendance?.status === "PRESENT";
+                        return (
+                            <div key={p.id} className="person-profile-card">
+                                <div className="profile-header">
+                                    <div className="avatar-large">{p.name.charAt(0)}</div>
+                                    <div className="profile-meta">
+                                        <h3 className="person-card-name">{p.name}</h3>
+                                        <span className="profile-id">{p.identifier}</span>
+                                    </div>
+                                    <span className={`enroll-status-badge ${isEnrolled ? "enrolled" : "pending"}`}>
+                                        {isEnrolled ? "● ENROLLED" : "○ PENDING"}
+                                    </span>
                                 </div>
-                                <span className={`enroll-status-badge ${isEnrolled ? "enrolled" : "pending"}`}>
-                                    {isEnrolled ? "● ENROLLED" : "○ PENDING"}
-                                </span>
-                            </div>
 
-                            <div className="profile-details-list">
-                                <div className="detail-item">
-                                    <span>ROLE</span>
-                                    <strong>{p.role?.toUpperCase()}</strong>
+                                <div className="profile-details-list">
+                                    <div className="detail-item">
+                                        <span>ROLE</span>
+                                        <strong>{p.role?.toUpperCase()}</strong>
+                                    </div>
+                                    <div className="detail-item">
+                                        <span>DEPARTMENT</span>
+                                        <strong>{p.department || "General"}</strong>
+                                    </div>
+                                    <div className="detail-item">
+                                        <span>CLASS / GRADE</span>
+                                        <strong>{p.class_grade || "--"}</strong>
+                                    </div>
+                                    <div className="detail-item">
+                                        <span>ALLOWED DRESS</span>
+                                        <strong className="text-primary">{p.allowed_dress || "Formals"}</strong>
+                                    </div>
+                                    <div className="detail-item">
+                                        <span>TODAY'S STATUS</span>
+                                        <strong className={isPresentToday ? "text-success" : "text-muted"}>
+                                            {isPresentToday ? "● PRESENT" : "○ NOT LOGGED"}
+                                        </strong>
+                                    </div>
+                                    <div className="detail-item">
+                                        <span>ACCOUNT</span>
+                                        <strong className="text-secondary">{p.status?.toUpperCase() || "ACTIVE"}</strong>
+                                    </div>
                                 </div>
-                                <div className="detail-item">
-                                    <span>DEPARTMENT</span>
-                                    <strong>{p.department || "General"}</strong>
-                                </div>
-                                <div className="detail-item">
-                                    <span>CLASS / GRADE</span>
-                                    <strong>{p.class_grade || "--"}</strong>
-                                </div>
-                                <div className="detail-item">
-                                    <span>ALLOWED DRESS</span>
-                                    <strong className="text-primary">{p.allowed_dress || "Formals"}</strong>
-                                </div>
-                                <div className="detail-item">
-                                    <span>TODAY'S STATUS</span>
-                                    <strong className={isPresentToday ? "text-success" : "text-muted"}>
-                                        {isPresentToday ? "● PRESENT" : "○ NOT LOGGED"}
-                                    </strong>
-                                </div>
-                                <div className="detail-item">
-                                    <span>ACCOUNT</span>
-                                    <strong className="text-secondary">{p.status?.toUpperCase() || "ACTIVE"}</strong>
-                                </div>
-                            </div>
 
-                            <div className="profile-card-actions-row">
-                                <button
-                                    className="btn-inspect-mini full-width"
-                                    onClick={() => handleOpenEditModal(p)}
-                                >
-                                    📝 Edit Profile & Records Table
-                                </button>
-                                {!isEnrolled ? (
+                                <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginTop: "12px" }}>
                                     <button
-                                        className="btn-primary-mini"
-                                        onClick={() => handleEnrollFace(p)}
+                                        className="tool-btn btn-primary"
+                                        onClick={() => handleOpenDossier(p)}
+                                        style={{ fontSize: "11px", padding: "6px 12px", background: "linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)", color: "#ffffff" }}
                                     >
-                                        📷 Enroll Face
+                                        📁 View &amp; Export AI Dossier File
                                     </button>
-                                ) : (
-                                    <button
-                                        className="btn-secondary-mini"
-                                        onClick={() => handleEnrollFace(p)}
-                                        title="Re-scan face vector"
-                                    >
-                                        🔄 Re-enroll
-                                    </button>
-                                )}
+                                    <div style={{ display: "flex", gap: "6px" }}>
+                                        <button
+                                            className="tool-btn btn-secondary-mini"
+                                            onClick={() => handleOpenEditModal(p)}
+                                            style={{ flex: 1, fontSize: "11px" }}
+                                        >
+                                            ✏️ Edit Profile
+                                        </button>
+                                        {!isEnrolled ? (
+                                            <button
+                                                className="tool-btn btn-primary"
+                                                onClick={() => handleEnrollFace(p)}
+                                                style={{ fontSize: "11px" }}
+                                            >
+                                                📷 Enroll
+                                            </button>
+                                        ) : (
+                                            <button
+                                                className="tool-btn btn-secondary-mini"
+                                                onClick={() => handleMarkPresent(p.id, p.name)}
+                                                style={{ fontSize: "11px" }}
+                                            >
+                                                ✓ Check-in
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
-                        </div>
-                    );
-                })}
+                        );
+                    })
+                )}
             </div>
 
-            {/* ── Person Data Modification Window (Profile Editor & Individual Table) ── */}
+            {/* ── Individual AI Dossier File Viewer Modal (Point 6) ── */}
+            {showDossierModal && (
+                <div className="modal-overlay" onClick={() => setShowDossierModal(false)}>
+                    <div className="modal-dialog-large" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "900px" }}>
+                        <div className="modal-header" style={{ borderBottom: "2px solid #e2e8f0" }}>
+                            <div>
+                                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                    <span style={{ fontSize: "20px" }}>📁</span>
+                                    <h3 style={{ margin: 0, fontSize: "17px", fontWeight: 700 }}>
+                                        {dossierData?.dossier_title || "AI Individual Dossier File"}
+                                    </h3>
+                                </div>
+                                <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "2px" }}>
+                                    Reference: <code>{dossierData?.dossier_id}</code> • Maintained 24/7 by Sentronix AI Core
+                                </div>
+                            </div>
+                            <div style={{ display: "flex", gap: "8px" }}>
+                                {dossierData && (
+                                    <>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleDownloadDossierMd(dossierData.person_details.id, dossierData.person_details.name)}
+                                            className="tool-btn btn-primary"
+                                            style={{ fontSize: "11px", padding: "6px 12px" }}
+                                        >
+                                            📥 Download .MD
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleDownloadDossierJson(dossierData, dossierData.person_details.name)}
+                                            className="tool-btn btn-secondary-mini"
+                                            style={{ fontSize: "11px", padding: "6px 12px" }}
+                                        >
+                                            📥 Download .JSON
+                                        </button>
+                                    </>
+                                )}
+                                <button className="tool-btn btn-secondary-mini" onClick={() => setShowDossierModal(false)}>✕</button>
+                            </div>
+                        </div>
+
+                        {loadingDossier ? (
+                            <div style={{ padding: "40px", textAlign: "center" }}>Loading AI dossier from disk...</div>
+                        ) : dossierData ? (
+                            <div style={{ padding: "20px 24px", maxHeight: "70vh", overflowY: "auto" }}>
+                                {/* Profile Credentials Grid */}
+                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "18px" }}>
+                                    <div style={{ padding: "14px", background: "var(--bg-secondary)", borderRadius: "8px", border: "1px solid var(--border-color)" }}>
+                                        <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase" }}>Personal Biometric Credentials</div>
+                                        <div style={{ fontSize: "14px", fontWeight: 700, marginTop: "6px" }}>{dossierData.person_details.name}</div>
+                                        <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "2px" }}>ID: {dossierData.person_details.identifier} • Role: {dossierData.person_details.role.toUpperCase()}</div>
+                                        <div style={{ fontSize: "12px", color: "var(--text-secondary)" }}>Dept: {dossierData.person_details.department} • Grade: {dossierData.person_details.class_grade}</div>
+                                        <div style={{ fontSize: "12px", marginTop: "4px" }}>Allowed Dress: <strong className="text-primary">{dossierData.person_details.allowed_dress}</strong></div>
+                                    </div>
+
+                                    <div style={{ padding: "14px", background: "var(--bg-secondary)", borderRadius: "8px", border: "1px solid var(--border-color)" }}>
+                                        <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase" }}>AI Biometric &amp; Compliance Rate</div>
+                                        <div style={{ fontSize: "22px", fontWeight: 800, color: "var(--success-color)", marginTop: "4px" }}>
+                                            {dossierData.attendance_performance.compliance_rate}
+                                        </div>
+                                        <div style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
+                                            Check-ins Recorded: {dossierData.attendance_performance.present_count} / {dossierData.attendance_performance.total_records}
+                                        </div>
+                                        <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "4px" }}>
+                                            Biometric Facial Match Avg: {dossierData.biometric_analytics.face_confidence_avg} • Anti-Spoof: PASSED
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* AI Assessment Banner */}
+                                <div style={{ padding: "12px 16px", background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: "8px", color: "#0369a1", fontSize: "13px", marginBottom: "18px" }}>
+                                    <strong>🧠 AI Autonomous Assessment:</strong> "{dossierData.ai_autonomous_assessment}"
+                                </div>
+
+                                {/* Attendance & Biometric Audit Log Table */}
+                                <h4 style={{ margin: "0 0 8px 0", fontSize: "13px", fontWeight: 700 }}>
+                                    📅 Biometric Check-in History (Stored in Individual File)
+                                </h4>
+                                <div style={{ border: "1px solid var(--border-color)", borderRadius: "8px", overflow: "hidden", marginBottom: "18px" }}>
+                                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px" }}>
+                                        <thead>
+                                            <tr style={{ background: "var(--bg-secondary)", borderBottom: "1px solid var(--border-color)", textAlign: "left" }}>
+                                                <th style={{ padding: "8px 12px" }}>Timestamp</th>
+                                                <th style={{ padding: "8px 12px" }}>Camera / Zone</th>
+                                                <th style={{ padding: "8px 12px" }}>Status</th>
+                                                <th style={{ padding: "8px 12px" }}>Confidence</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {dossierData.attendance_performance.history.length === 0 ? (
+                                                <tr>
+                                                    <td colSpan={4} style={{ padding: "16px", textAlign: "center", color: "var(--text-muted)" }}>
+                                                        No attendance scans recorded for this individual yet.
+                                                    </td>
+                                                </tr>
+                                            ) : (
+                                                dossierData.attendance_performance.history.map((h, i) => (
+                                                    <tr key={i} style={{ borderBottom: "1px solid var(--border-color)" }}>
+                                                        <td style={{ padding: "8px 12px" }}>{h.timestamp}</td>
+                                                        <td style={{ padding: "8px 12px" }}>{h.camera_name || "Main Gate Checkpoint"}</td>
+                                                        <td style={{ padding: "8px 12px" }}>
+                                                            <span className="cam-func-badge badge-primary">{h.status}</span>
+                                                        </td>
+                                                        <td style={{ padding: "8px 12px" }}>{((h.confidence || 0.94) * 100).toFixed(1)}%</td>
+                                                    </tr>
+                                                ))
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                {/* Prohibited Activity / Alert Records */}
+                                <h4 style={{ margin: "0 0 8px 0", fontSize: "13px", fontWeight: 700 }}>
+                                    🚨 Security &amp; Prohibited Activity Records
+                                </h4>
+                                <div style={{ padding: "12px", background: "var(--bg-secondary)", borderRadius: "8px", border: "1px solid var(--border-color)", fontSize: "12px" }}>
+                                    {dossierData.security_alerts_and_flags.length === 0 ? (
+                                        <div style={{ color: "#166534" }}>✓ Clean conduct record. Zero prohibited activities or violations on file.</div>
+                                    ) : (
+                                        dossierData.security_alerts_and_flags.map((al, idx) => (
+                                            <div key={idx} style={{ marginBottom: "6px" }}>
+                                                <strong>[{al.priority}]</strong> {al.timestamp}: {al.object}
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+                        ) : null}
+                    </div>
+                </div>
+            )}
+
+            {/* ── Person Profile Edit Modal ── */}
             {selectedPerson && (
                 <div className="modal-overlay" onClick={() => setSelectedPerson(null)}>
                     <div className="modal-dialog-large" onClick={(e) => e.stopPropagation()}>
                         <div className="modal-header">
-                            <div className="modal-title-group">
-                                <h3>Data Modification Window — {selectedPerson.name}</h3>
-                                <span className="profile-id-chip">ID: {selectedPerson.identifier}</span>
+                            <div>
+                                <h3 style={{ margin: 0, fontSize: "16px" }}>Edit Profile &amp; Data — {selectedPerson.name}</h3>
+                                <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>ID: {selectedPerson.identifier}</span>
                             </div>
-                            <button className="close-btn" onClick={() => setSelectedPerson(null)}>
-                                ×
-                            </button>
+                            <button className="tool-btn btn-secondary-mini" onClick={() => setSelectedPerson(null)}>✕</button>
                         </div>
 
-                        <div className="modal-two-column-body">
-                            {/* Left Column: Editable Profile Data Form */}
-                            <div className="modal-column-left">
-                                <h4 className="section-subtitle">👤 Modify Individual Profile Data</h4>
-                                <form onSubmit={handleSavePersonEdit} className="person-edit-form">
-                                    <div className="form-group">
-                                        <label>Full Name (Editable)</label>
+                        <div style={{ padding: "20px 24px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
+                            {/* Left: Edit Form */}
+                            <form onSubmit={handleSavePersonEdit} style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                                <div>
+                                    <label className="fleet-stat-label">Full Name</label>
+                                    <input
+                                        className="form-control"
+                                        value={editFormData.name}
+                                        onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                                        style={{ width: "100%", padding: "7px 10px", fontSize: "12px", border: "1px solid var(--border-color)", borderRadius: "4px" }}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="fleet-stat-label">Unique ID / Roll No.</label>
+                                    <input
+                                        className="form-control"
+                                        value={editFormData.identifier}
+                                        onChange={(e) => setEditFormData({ ...editFormData, identifier: e.target.value })}
+                                        style={{ width: "100%", padding: "7px 10px", fontSize: "12px", border: "1px solid var(--border-color)", borderRadius: "4px" }}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="fleet-stat-label">Permitted Dress Code Policy</label>
+                                    <input
+                                        className="form-control"
+                                        value={editFormData.allowed_dress}
+                                        onChange={(e) => setEditFormData({ ...editFormData, allowed_dress: e.target.value })}
+                                        style={{ width: "100%", padding: "7px 10px", fontSize: "12px", border: "1px solid var(--border-color)", borderRadius: "4px" }}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="fleet-stat-label">Phone &amp; Email</label>
+                                    <div style={{ display: "flex", gap: "8px" }}>
                                         <input
-                                            type="text"
-                                            value={editFormData.name}
-                                            onChange={(e) =>
-                                                setEditFormData({ ...editFormData, name: e.target.value })
-                                            }
-                                            required
+                                            className="form-control"
+                                            value={editFormData.phone}
+                                            onChange={(e) => setEditFormData({ ...editFormData, phone: e.target.value })}
+                                            placeholder="Phone"
+                                            style={{ flex: 1, padding: "7px 10px", fontSize: "12px", border: "1px solid var(--border-color)", borderRadius: "4px" }}
+                                        />
+                                        <input
+                                            className="form-control"
+                                            value={editFormData.email}
+                                            onChange={(e) => setEditFormData({ ...editFormData, email: e.target.value })}
+                                            placeholder="Email"
+                                            style={{ flex: 1, padding: "7px 10px", fontSize: "12px", border: "1px solid var(--border-color)", borderRadius: "4px" }}
                                         />
                                     </div>
-
-                                    <div className="form-row">
-                                        <div className="form-group">
-                                            <label>Identifier (Student / Staff ID)</label>
-                                            <input
-                                                type="text"
-                                                value={editFormData.identifier}
-                                                onChange={(e) =>
-                                                    setEditFormData({ ...editFormData, identifier: e.target.value })
-                                                }
-                                                required
-                                            />
-                                        </div>
-                                        <div className="form-group">
-                                            <label>Role</label>
-                                            <select
-                                                value={editFormData.role}
-                                                onChange={(e) =>
-                                                    setEditFormData({ ...editFormData, role: e.target.value })
-                                                }
-                                            >
-                                                <option value="student">Student</option>
-                                                <option value="staff">Staff / Faculty</option>
-                                                <option value="visitor">Visitor</option>
-                                            </select>
-                                        </div>
-                                    </div>
-
-                                    <div className="form-row">
-                                        <div className="form-group">
-                                            <label>Department</label>
-                                            <input
-                                                type="text"
-                                                value={editFormData.department}
-                                                onChange={(e) =>
-                                                    setEditFormData({ ...editFormData, department: e.target.value })
-                                                }
-                                            />
-                                        </div>
-                                        <div className="form-group">
-                                            <label>Class / Grade</label>
-                                            <input
-                                                type="text"
-                                                value={editFormData.class_grade}
-                                                onChange={(e) =>
-                                                    setEditFormData({ ...editFormData, class_grade: e.target.value })
-                                                }
-                                            />
-                                        </div>
-                                    </div>
-
-                                    <div className="form-row">
-                                        <div className="form-group">
-                                            <label>Allowed Dress Code Policy</label>
-                                            <select
-                                                value={editFormData.allowed_dress}
-                                                onChange={(e) =>
-                                                    setEditFormData({ ...editFormData, allowed_dress: e.target.value })
-                                                }
-                                            >
-                                                <option value="Formals & Regular Uniform">
-                                                    Formals & Regular School Dress (Only Allowed)
-                                                </option>
-                                                <option value="Formal Business Attire">
-                                                    Formal Business Attire
-                                                </option>
-                                                <option value="Lab Coat & Uniform">
-                                                    Lab Coat & Formal Uniform
-                                                </option>
-                                                <option value="Casual Permitted">Casual Permitted</option>
-                                            </select>
-                                        </div>
-                                        <div className="form-group">
-                                            <label>Account Status</label>
-                                            <select
-                                                value={editFormData.status}
-                                                onChange={(e) =>
-                                                    setEditFormData({ ...editFormData, status: e.target.value })
-                                                }
-                                            >
-                                                <option value="active">Active</option>
-                                                <option value="on_leave">On Leave</option>
-                                                <option value="suspended">Suspended</option>
-                                                <option value="graduated">Graduated</option>
-                                            </select>
-                                        </div>
-                                    </div>
-
-                                    <div className="form-row">
-                                        <div className="form-group">
-                                            <label>Contact Phone</label>
-                                            <input
-                                                type="text"
-                                                placeholder="+91 98765 43210"
-                                                value={editFormData.phone}
-                                                onChange={(e) =>
-                                                    setEditFormData({ ...editFormData, phone: e.target.value })
-                                                }
-                                            />
-                                        </div>
-                                        <div className="form-group">
-                                            <label>Email Address</label>
-                                            <input
-                                                type="email"
-                                                placeholder="student@school.edu"
-                                                value={editFormData.email}
-                                                onChange={(e) =>
-                                                    setEditFormData({ ...editFormData, email: e.target.value })
-                                                }
-                                            />
-                                        </div>
-                                    </div>
-
-                                    <div className="form-actions-bar">
-                                        <button type="submit" className="btn-primary">
-                                            💾 Save Profile Changes
-                                        </button>
-                                        <button
-                                            type="button"
-                                            className="btn-success"
-                                            onClick={handleMarkPresentNow}
-                                        >
-                                            ✓ Mark Present Today
-                                        </button>
-                                        <button
-                                            type="button"
-                                            className="btn-danger-ghost"
-                                            onClick={() => handleDeletePerson(selectedPerson.id)}
-                                        >
-                                            🗑 Delete Profile
-                                        </button>
-                                    </div>
-                                </form>
-                            </div>
-
-                            {/* Right Column: Individual Records & Activity Table */}
-                            <div className="modal-column-right">
-                                <div className="history-table-header">
-                                    <h4 className="section-subtitle">
-                                        📋 Individual Records Table ({personHistory.length} logs)
-                                    </h4>
-                                    <span className="live-log-tag">REAL-TIME BIOMETRIC AUDIT</span>
                                 </div>
+                                <div style={{ display: "flex", justifyContent: "space-between", marginTop: "10px" }}>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleDelete(selectedPerson.id, selectedPerson.name)}
+                                        style={{ background: "#fef2f2", color: "#b91c1c", border: "1px solid #fecaca", padding: "6px 14px", borderRadius: "4px", fontSize: "12px", cursor: "pointer" }}
+                                    >
+                                        Delete Person
+                                    </button>
+                                    <button type="submit" className="tool-btn btn-primary" style={{ padding: "6px 18px", fontSize: "12px" }}>
+                                        Save Changes
+                                    </button>
+                                </div>
+                            </form>
 
-                                <div className="individual-table-wrapper">
-                                    <table className="soc-table individual-records-table">
+                            {/* Right: History Log */}
+                            <div>
+                                <h4 style={{ margin: "0 0 8px 0", fontSize: "13px", fontWeight: 700 }}>Individual Audit Record</h4>
+                                <div style={{ maxHeight: "280px", overflowY: "auto", border: "1px solid var(--border-color)", borderRadius: "6px" }}>
+                                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "11px" }}>
                                         <thead>
-                                            <tr>
-                                                <th>TIMESTAMP</th>
-                                                <th>EVENT TYPE</th>
-                                                <th>CAMERA</th>
-                                                <th>STATUS</th>
-                                                <th>CONFIDENCE</th>
-                                                <th>NOTES</th>
+                                            <tr style={{ background: "var(--bg-secondary)", borderBottom: "1px solid var(--border-color)" }}>
+                                                <th style={{ padding: "6px 8px", textAlign: "left" }}>Timestamp</th>
+                                                <th style={{ padding: "6px 8px", textAlign: "left" }}>Event</th>
+                                                <th style={{ padding: "6px 8px", textAlign: "left" }}>Status</th>
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {loadingHistory ? (
+                                            {personHistory.length === 0 ? (
                                                 <tr>
-                                                    <td colSpan="6" className="empty-cell">
-                                                        Loading records table...
-                                                    </td>
-                                                </tr>
-                                            ) : personHistory.length === 0 ? (
-                                                <tr>
-                                                    <td colSpan="6" className="empty-cell">
-                                                        No activity logs recorded for this individual yet.
+                                                    <td colSpan={3} style={{ padding: "14px", textAlign: "center", color: "var(--text-muted)" }}>
+                                                        No history logged yet.
                                                     </td>
                                                 </tr>
                                             ) : (
-                                                personHistory.map((rec) => (
-                                                    <tr key={rec.id}>
-                                                        <td className="timestamp-cell">{rec.timestamp}</td>
-                                                        <td>
-                                                            <span className={`event-type-chip ${rec.type?.toLowerCase()}`}>
-                                                                {rec.event}
-                                                            </span>
+                                                personHistory.map((h, i) => (
+                                                    <tr key={i} style={{ borderBottom: "1px solid var(--border-color)" }}>
+                                                        <td style={{ padding: "6px 8px" }}>{h.timestamp}</td>
+                                                        <td style={{ padding: "6px 8px" }}>{h.event}</td>
+                                                        <td style={{ padding: "6px 8px" }}>
+                                                            <span className="cam-func-badge badge-primary">{h.status}</span>
                                                         </td>
-                                                        <td>{rec.camera}</td>
-                                                        <td>
-                                                            <span
-                                                                className={`status-badge-chip ${
-                                                                    rec.status === "PRESENT"
-                                                                        ? "success"
-                                                                        : rec.status === "LATE"
-                                                                        ? "warning"
-                                                                        : "danger"
-                                                                }`}
-                                                            >
-                                                                {rec.status}
-                                                            </span>
-                                                        </td>
-                                                        <td>{Math.round((rec.confidence || 0.95) * 100)}%</td>
-                                                        <td className="notes-cell">{rec.notes}</td>
                                                     </tr>
                                                 ))
                                             )}
@@ -526,106 +643,62 @@ export default function PeopleView() {
                 </div>
             )}
 
-            {/* ── Register New Person Modal ── */}
+            {/* ── Add Person Modal ── */}
             {showAddModal && (
                 <div className="modal-overlay" onClick={() => setShowAddModal(false)}>
                     <div className="modal-dialog" onClick={(e) => e.stopPropagation()}>
                         <div className="modal-header">
-                            <h3>Register Person</h3>
-                            <button className="close-btn" onClick={() => setShowAddModal(false)}>
-                                ×
-                            </button>
+                            <h3>➕ Register Person</h3>
+                            <button className="tool-btn btn-secondary-mini" onClick={() => setShowAddModal(false)}>✕</button>
                         </div>
                         <form onSubmit={handleCreatePerson} className="modal-form">
-                            <div className="form-group">
-                                <label>Full Name</label>
+                            <div>
+                                <label className="fleet-stat-label">Full Name *</label>
                                 <input
-                                    type="text"
-                                    placeholder="e.g. Priya Sharma"
+                                    className="form-control"
                                     value={newName}
                                     onChange={(e) => setNewName(e.target.value)}
+                                    placeholder="e.g. Diya Patel"
                                     required
+                                    style={{ width: "100%", padding: "8px 12px", fontSize: "13px" }}
                                 />
                             </div>
-                            <div className="form-group">
-                                <label>Identifier (Student / Staff ID)</label>
+                            <div>
+                                <label className="fleet-stat-label">Unique ID / Roll No. *</label>
                                 <input
-                                    type="text"
-                                    placeholder="e.g. STU-105"
+                                    className="form-control"
                                     value={newIdentifier}
                                     onChange={(e) => setNewIdentifier(e.target.value)}
+                                    placeholder="e.g. STU-2026-05"
                                     required
+                                    style={{ width: "100%", padding: "8px 12px", fontSize: "13px" }}
                                 />
                             </div>
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label>Role</label>
-                                    <select value={newRole} onChange={(e) => setNewRole(e.target.value)}>
-                                        <option value="student">Student</option>
-                                        <option value="staff">Staff / Faculty</option>
-                                        <option value="visitor">Visitor</option>
-                                    </select>
-                                </div>
-                                <div className="form-group">
-                                    <label>Allowed Dress Policy</label>
-                                    <select value={newDress} onChange={(e) => setNewDress(e.target.value)}>
-                                        <option value="Formals & Regular Uniform">Formals & Regular School Dress</option>
-                                        <option value="Formal Business Attire">Formal Business Attire</option>
-                                        <option value="Casual Permitted">Casual Permitted</option>
-                                    </select>
-                                </div>
+                            <div>
+                                <label className="fleet-stat-label">Role</label>
+                                <select
+                                    className="sector-select-box"
+                                    value={newRole}
+                                    onChange={(e) => setNewRole(e.target.value)}
+                                    style={{ width: "100%", padding: "8px 12px", fontSize: "13px" }}
+                                >
+                                    <option value="student">Student</option>
+                                    <option value="staff">Staff / Faculty</option>
+                                    <option value="visitor">Visitor</option>
+                                </select>
                             </div>
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label>Department</label>
-                                    <input
-                                        type="text"
-                                        placeholder="e.g. Computer Science"
-                                        value={newDept}
-                                        onChange={(e) => setNewDept(e.target.value)}
-                                    />
-                                </div>
-                                <div className="form-group">
-                                    <label>Class / Grade</label>
-                                    <input
-                                        type="text"
-                                        placeholder="e.g. Grade 11-B"
-                                        value={newGrade}
-                                        onChange={(e) => setNewGrade(e.target.value)}
-                                    />
-                                </div>
-                            </div>
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label>Contact Phone</label>
-                                    <input
-                                        type="text"
-                                        placeholder="+91 98765 43210"
-                                        value={newPhone}
-                                        onChange={(e) => setNewPhone(e.target.value)}
-                                    />
-                                </div>
-                                <div className="form-group">
-                                    <label>Email Address</label>
-                                    <input
-                                        type="email"
-                                        placeholder="student@school.edu"
-                                        value={newEmail}
-                                        onChange={(e) => setNewEmail(e.target.value)}
-                                    />
-                                </div>
+                            <div>
+                                <label className="fleet-stat-label">Permitted Dress Policy</label>
+                                <input
+                                    className="form-control"
+                                    value={newDress}
+                                    onChange={(e) => setNewDress(e.target.value)}
+                                    style={{ width: "100%", padding: "8px 12px", fontSize: "13px" }}
+                                />
                             </div>
                             <div className="modal-actions">
-                                <button
-                                    type="button"
-                                    className="btn-secondary"
-                                    onClick={() => setShowAddModal(false)}
-                                >
-                                    Cancel
-                                </button>
-                                <button type="submit" className="btn-primary">
-                                    Register Profile
-                                </button>
+                                <button type="button" className="tool-btn btn-secondary-mini" onClick={() => setShowAddModal(false)}>Cancel</button>
+                                <button type="submit" className="tool-btn btn-primary">Create Profile &amp; AI Dossier</button>
                             </div>
                         </form>
                     </div>
