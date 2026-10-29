@@ -1,0 +1,43 @@
+{
+  "dossier_title": "SENTRONIX AI DOSSIER: MAJOR SUNITA RAO",
+  "dossier_id": "DOS-1-0046",
+  "generated_by": "SENTRONIX 24/7 AI SURVEILLANCE BRAIN",
+  "last_updated": "2026-10-29 09:08:57",
+  "person_details": {
+    "id": 46,
+    "name": "Major Sunita Rao",
+    "identifier": "OFF-202",
+    "role": "staff",
+    "department": "Tactical Operations",
+    "class_grade": "Commandant",
+    "allowed_dress": "Service Dress Uniform",
+    "phone": "+91 9988776655",
+    "email": "sunita.rao@academy.edu",
+    "status": "active",
+    "photo_url": null,
+    "biometrics_enrolled": true
+  },
+  "biometric_analytics": {
+    "face_confidence_avg": "94.8%",
+    "liveness_verified": true,
+    "facial_features_extracted": 128,
+    "anti_spoof_status": "PASSED (REAL HUMAN)"
+  },
+  "attendance_performance": {
+    "total_records": 0,
+    "present_count": 0,
+    "compliance_rate": "100.0%",
+    "last_checkin": "None recorded yet",
+    "history": []
+  },
+  "dress_code_audits": [
+    {
+      "date": "2026-10-29",
+      "evaluated_policy": "Service Dress Uniform",
+      "status": "COMPLIANT",
+      "notes": "Upper body formal uniform guidelines satisfied."
+    }
+  ],
+  "security_alerts_and_flags": [],
+  "ai_autonomous_assessment": "Subject Major Sunita Rao (OFF-202) holds verified biometric authorization. Attendance compliance is at 100.0%. All dress code and designated perimeter guidelines are in satisfactory standing."
+}

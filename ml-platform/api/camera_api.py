@@ -255,10 +255,20 @@ def create_camera(req: CreateCameraRequest):
 
 
 @router.patch("/{camera_id}/function")
-def assign_camera_function(camera_id: int, req: UpdateFunctionRequest):
-    """Assigns an operational AI function to a specific camera."""
+def assign_camera_function(
+    camera_id: int,
+    req: Optional[UpdateFunctionRequest] = None,
+    assigned_function: Optional[str] = None,
+):
+    """Assigns an operational AI function strictly to a specific camera (preserving other cameras' functions)."""
     valid_ids = [f["id"] for f in CAMERA_FUNCTIONS]
-    func_upper = req.assigned_function.upper()
+    raw_func = (req.assigned_function if req else None) or assigned_function
+    if not raw_func:
+        raise HTTPException(
+            status_code=400,
+            detail="assigned_function is required in body or query param",
+        )
+    func_upper = raw_func.upper()
     if func_upper not in valid_ids:
         raise HTTPException(
             status_code=400,

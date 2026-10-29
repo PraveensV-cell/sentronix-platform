@@ -1,11 +1,10 @@
 /* ==========================================================================
    SENTRONIX AI — Enterprise Multi-Mode Command Center Design System
-   Supporting Light & Dark Mode for Every Operational Domain:
-   • Academic Campus (School)
-   • Military & Tactical Defense Command
-   • Heavy Industry, Chemical & Plant Safety
-   • Civic Transit, Public Thoroughfares & Emergency Triage
-   • Corporate Campus & Executive FinTech Hub
+   Palettes:
+   • Light Mode: Crisp White, Royal Gold & Ruby Red (#dc2626)
+   • Dark Mode: Obsidian Black (#06090e), Brushed Silver (#cbd5e1), Gold (#d4af37)
+   • Selective Glassmorphism (Navbar, Mode Topbar, AI Broadcast, Modals only)
+   • Strictly Independent Per-Camera AI Function Assignment
    ========================================================================== */
 
 /* ── Global Layout Root ─────────────────────────────────────────────────── */
@@ -37,13 +36,14 @@
     background: transparent;
 }
 
-/* ── Executive Top Navigation Bar ───────────────────────────────────────── */
+/* ── Executive Top Navigation Bar (Selective Glass Look in Dark Mode) ──── */
 .soc-navbar {
     height: 54px;
     background-color: var(--bg-panel);
-    backdrop-filter: blur(12px);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
     border-bottom: 1px solid var(--border-color);
-    box-shadow: 0 2px 14px rgba(0, 0, 0, 0.08);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -148,9 +148,9 @@
 }
 
 .status-pill.offline {
-    background-color: rgba(239, 68, 68, 0.12);
-    border: 1px solid rgba(239, 68, 68, 0.3);
-    color: #ef4444;
+    background-color: rgba(220, 38, 38, 0.12);
+    border: 1px solid rgba(220, 38, 38, 0.3);
+    color: #dc2626;
 }
 
 .status-dot {
@@ -165,7 +165,7 @@
 }
 
 .status-pill.offline .status-dot {
-    background-color: #ef4444;
+    background-color: #dc2626;
 }
 
 .ai-assistant-toggle-btn {
@@ -241,9 +241,9 @@
 }
 
 .logout-btn:hover {
-    background: rgba(239, 68, 68, 0.15);
-    border-color: rgba(239, 68, 68, 0.3);
-    color: #ef4444;
+    background: rgba(220, 38, 38, 0.15);
+    border-color: rgba(220, 38, 38, 0.3);
+    color: #dc2626;
 }
 
 /* ── Sleek Slim Sidebar (210px) ─────────────────────────────────────────── */
@@ -306,13 +306,15 @@
     flex: 1;
 }
 
+/* Red Alert Counter Badge */
 .nav-alert-badge {
-    background-color: #ef4444;
+    background-color: #dc2626;
     color: #ffffff;
     font-size: 10px;
-    font-weight: 700;
+    font-weight: 800;
     padding: 1px 6px;
     border-radius: 10px;
+    box-shadow: 0 0 8px rgba(220, 38, 38, 0.4);
 }
 
 .sidebar-footer {
@@ -335,7 +337,7 @@
     margin-top: 2px;
 }
 
-/* ── DISTINCT MODE-SPECIFIC TOP BARS (Point 3) ─────────────────────────── */
+/* ── DISTINCT MODE TOP BARS (Selective Glass Look) ──────────────────────── */
 .mode-distinct-topbar {
     display: flex;
     justify-content: space-between;
@@ -348,6 +350,17 @@
     margin-bottom: 14px;
     flex-wrap: wrap;
     gap: 12px;
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+}
+
+/* Light mode Red highlights */
+[data-theme="light"] .school-bar {
+    border-left: 4px solid #dc2626;
+}
+
+[data-theme="light"] .school-bar .topbar-tag {
+    color: #dc2626 !important;
 }
 
 .topbar-info-block {
@@ -404,6 +417,7 @@
 .text-emerald { color: #22c55e !important; }
 .text-amber { color: #f59e0b !important; }
 .text-cyan { color: #06b6d4 !important; }
+.text-red { color: #dc2626 !important; }
 
 /* Tactical Optics Toggle Buttons */
 .optics-buttons {
@@ -430,7 +444,7 @@
     border-color: #22c55e;
 }
 
-/* ── Live AI Action HUD Card ────────────────────────────────────────────── */
+/* ── Live AI Action HUD Card (Selective Glass Look) ─────────────────────── */
 .live-ai-broadcast-card {
     background: var(--card-bg);
     border: 1px solid var(--border-color);
@@ -441,6 +455,8 @@
     align-items: center;
     box-shadow: var(--card-shadow);
     margin-bottom: 14px;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
 }
 
 .ai-crest-icon {
@@ -524,6 +540,7 @@
     padding: 2px 8px;
     border-radius: 8px;
     font-weight: 700;
+    backdrop-filter: blur(8px);
 }
 
 .stage-sub {
@@ -549,6 +566,7 @@
     background: rgba(16, 185, 129, 0.12);
     border: 1px solid rgba(16, 185, 129, 0.3);
     color: #10b981;
+    backdrop-filter: blur(8px);
 }
 
 .live-dot-pulse {
@@ -654,7 +672,7 @@
     margin-left: 12px;
 }
 
-/* ── DISTINCT MODE-SPECIFIC RIGHT SIDEBAR PANELS (Point 3) ──────────────── */
+/* ── DISTINCT MODE-SPECIFIC RIGHT SIDEBAR PANELS ────────────────────────── */
 .surveillance-right-sidebar {
     width: 330px;
     display: flex;
@@ -894,7 +912,7 @@
     color: var(--text-muted);
 }
 
-/* Camera Device Picker */
+/* ── Camera Device Picker with Per-Camera Function Dropdown (Point 2) ───── */
 .camera-picker-card {
     background: var(--card-bg);
     border: 1px solid var(--border-color);
@@ -983,14 +1001,36 @@
 .cam-item-title-row {
     display: flex;
     justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+}
+
+.cam-item-name {
     font-size: 11px;
     font-weight: 700;
     color: var(--text-primary);
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-.cam-func-tag {
-    font-size: 9px;
-    color: var(--text-muted);
+/* Inline Function Select for Per-Camera Assignment */
+.cam-inline-func-select {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: var(--bg-secondary);
+    color: var(--primary-color);
+    border: 1px solid var(--border-color);
+    cursor: pointer;
+    outline: none;
+    max-width: 125px;
+}
+
+.cam-inline-func-select:hover {
+    border-color: var(--primary-color);
 }
 
 .cam-item-loc-row {
@@ -998,7 +1038,7 @@
     justify-content: space-between;
     font-size: 10px;
     color: var(--text-muted);
-    margin-top: 3px;
+    margin-top: 4px;
 }
 
 .cam-online-pill {
@@ -1016,6 +1056,7 @@
     border-radius: 8px;
     font-size: 12px;
     font-weight: 700;
+    backdrop-filter: blur(8px);
 }
 
 .external-plug-toast {
@@ -1038,6 +1079,7 @@
     flex-direction: column;
     gap: 4px;
     font-size: 11px;
+    backdrop-filter: blur(8px);
 }
 
 .advice-item {
@@ -1046,14 +1088,14 @@
 }
 
 .critical-alert-banner {
-    background: rgba(239, 68, 68, 0.15);
-    border: 1px solid rgba(239, 68, 68, 0.4);
+    background: rgba(220, 38, 38, 0.12);
+    border: 1px solid rgba(220, 38, 38, 0.35);
     border-radius: 8px;
     padding: 10px 16px;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    color: #ef4444;
+    color: #dc2626;
 }
 
 .btn-triage-violation {
@@ -1114,12 +1156,13 @@
     color: var(--text-primary);
 }
 
-/* ── Modal Dialogs ──────────────────────────────────────────────────────── */
+/* ── Modal Dialogs (Selective Glass Look in Dark Mode) ──────────────────── */
 .modal-overlay {
     position: fixed;
     inset: 0;
     background-color: rgba(0, 0, 0, 0.7);
-    backdrop-filter: blur(8px);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1132,10 +1175,12 @@
     background-color: var(--bg-panel);
     border: 1px solid var(--border-color);
     border-radius: 12px;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
     width: 100%;
     max-width: 520px;
     overflow: hidden;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
 }
 
 .modal-dialog-large {

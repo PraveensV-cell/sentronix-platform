@@ -201,7 +201,7 @@ export const updateCamera = async (cameraId: number | string, data: any) => {
 };
 
 export const assignCameraFunction = async (cameraId: number | string, assigned_function: string) => {
-    const res = await API.patch(`/cameras/${cameraId}/function`, null, { params: { assigned_function } });
+    const res = await API.patch(`/cameras/${cameraId}/function`, { assigned_function }, { params: { assigned_function } });
     return res.data;
 };
 

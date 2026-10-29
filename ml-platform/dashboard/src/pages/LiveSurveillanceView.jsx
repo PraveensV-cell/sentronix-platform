@@ -574,12 +574,17 @@ export default function LiveSurveillanceView({ environment, systemOnline }) {
         opticsMode,
     ]);
 
-    // ── Function Change Handler ──
+    // ── Function Change Handler strictly for Selected Camera ──
     const handleFunctionChange = async (newFunc) => {
         if (!selectedCamera) return;
         try {
             await assignCameraFunction(selectedCamera.id, newFunc);
             setSelectedCamera((prev) => ({ ...prev, assigned_function: newFunc }));
+            setCameras((prev) =>
+                prev.map((c) =>
+                    c.id === selectedCamera.id ? { ...c, assigned_function: newFunc } : c
+                )
+            );
 
             let actionText = "";
             const isMatch = livePerception.is_match && livePerception.matched_person;
@@ -588,25 +593,25 @@ export default function LiveSurveillanceView({ environment, systemOnline }) {
             if (newFunc === "FACE_ATTENDANCE") {
                 actionText = isMatch
                     ? `ATTENDANCE MARKED: ${pName} recorded PRESENT with 95% biometric match.`
-                    : "FACE ATTENDANCE ACTIVE: Scanning sector for registered personnel.";
+                    : `CAMERA #${selectedCamera.id} ASSIGNED: Face Attendance Active.`;
                 if (isMatch) {
                     markPersonPresent(livePerception.matched_person.id).catch(() => {});
                 }
             } else if (newFunc === "DRESS_CODE") {
-                actionText = `DRESS CODE & ID CHECK: Inspecting formals and neck lanyard badges.`;
+                actionText = `CAMERA #${selectedCamera.id} ASSIGNED: Dress Code & ID Card Inspection Active.`;
             } else if (newFunc === "EXAM_MONITOR") {
-                actionText = `EXAM PROCTORING ACTIVE: Seat Hall Alpha monitored • Zero prohibited items.`;
+                actionText = `CAMERA #${selectedCamera.id} ASSIGNED: Exam Proctoring Active.`;
             } else if (newFunc === "PERIMETER_INTRUSION") {
-                actionText = `PERIMETER ACTIVE: Sentry patrol nominal • Virtual tripwires armed.`;
+                actionText = `CAMERA #${selectedCamera.id} ASSIGNED: Sentry Perimeter Active.`;
             } else {
-                actionText = `FUNCTION ACTIVATED: ${newFunc.replace("_", " ")} running on ${selectedCamera.camera_name}.`;
+                actionText = `CAMERA #${selectedCamera.id} ASSIGNED: ${newFunc.replace("_", " ")} strictly for this camera.`;
             }
 
             setRecentAction({
                 type: newFunc,
                 text: actionText,
                 timestamp: new Date().toLocaleTimeString(),
-                badge: "COMPLETED",
+                badge: "CONFIGURED",
             });
 
             if ("speechSynthesis" in window && lastSpokenRef.current !== actionText) {
@@ -616,11 +621,30 @@ export default function LiveSurveillanceView({ environment, systemOnline }) {
                 window.speechSynthesis.speak(utterance);
             }
 
-            setSnapshotMsg(`Switched Camera #${selectedCamera.id} function to: ${newFunc.replace("_", " ")}`);
+            setSnapshotMsg(`✓ Camera #${selectedCamera.id} strictly assigned to: ${newFunc.replace("_", " ")}`);
             setTimeout(() => setSnapshotMsg(""), 3500);
             await loadData();
         } catch (err) {
             console.error("Failed to reassign function", err);
+        }
+    };
+
+    // ── Inline Function Change for Any Fleet Camera (Strictly Independent) ──
+    const handleInlineCameraFunctionChange = async (camId, newFunc) => {
+        try {
+            await assignCameraFunction(camId, newFunc);
+            setCameras((prev) =>
+                prev.map((c) =>
+                    c.id === camId ? { ...c, assigned_function: newFunc } : c
+                )
+            );
+            if (selectedCamera?.id === camId) {
+                setSelectedCamera((prev) => ({ ...prev, assigned_function: newFunc }));
+            }
+            setSnapshotMsg(`✓ Camera #${camId} strictly assigned to: ${newFunc.replace("_", " ")}`);
+            setTimeout(() => setSnapshotMsg(""), 3000);
+        } catch (err) {
+            console.error("Failed to assign camera function", err);
         }
     };
 
@@ -1276,9 +1300,23 @@ export default function LiveSurveillanceView({ environment, systemOnline }) {
                                     >
                                         <div className="cam-item-title-row">
                                             <span className="cam-item-name">{cam.camera_name}</span>
-                                            <span className="cam-func-tag">
-                                                {(cam.assigned_function || "ATTENDANCE").replace("_", " ")}
-                                            </span>
+                                            <select
+                                                value={cam.assigned_function || "FACE_ATTENDANCE"}
+                                                onClick={(e) => e.stopPropagation()}
+                                                onChange={async (e) => {
+                                                    e.stopPropagation();
+                                                    await handleInlineCameraFunctionChange(cam.id, e.target.value);
+                                                }}
+                                                className="cam-inline-func-select"
+                                                title="Assign independent AI function to this specific camera"
+                                            >
+                                                <option value="FACE_ATTENDANCE">🎓 Attendance</option>
+                                                <option value="DRESS_CODE">👔 Dress &amp; ID</option>
+                                                <option value="EXAM_MONITOR">📝 Exam Proctor</option>
+                                                <option value="PERIMETER_INTRUSION">🛡️ Sentry Perimeter</option>
+                                                <option value="DRESS_CODE_PPE">🦺 PPE Safety</option>
+                                                <option value="CROWD_LOITERING">👥 Crowd Loiter</option>
+                                            </select>
                                         </div>
                                         <div className="cam-item-loc-row">
                                             <span>📍 {cam.location}</span>
