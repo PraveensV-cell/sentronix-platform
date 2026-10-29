@@ -1,0 +1,43 @@
+{
+  "dossier_title": "SENTRONIX AI DOSSIER: DR. A. SHARMA",
+  "dossier_id": "DOS-1-0048",
+  "generated_by": "SENTRONIX 24/7 AI SURVEILLANCE BRAIN",
+  "last_updated": "2026-10-29 09:24:38",
+  "person_details": {
+    "id": 48,
+    "name": "Dr. A. Sharma",
+    "identifier": "FAC-102",
+    "role": "staff",
+    "department": "Artificial Intelligence",
+    "class_grade": "Professor",
+    "allowed_dress": "Academic Formals",
+    "phone": "+91 9876543211",
+    "email": "sharma@campus.edu",
+    "status": "active",
+    "photo_url": null,
+    "biometrics_enrolled": true
+  },
+  "biometric_analytics": {
+    "face_confidence_avg": "94.8%",
+    "liveness_verified": true,
+    "facial_features_extracted": 128,
+    "anti_spoof_status": "PASSED (REAL HUMAN)"
+  },
+  "attendance_performance": {
+    "total_records": 0,
+    "present_count": 0,
+    "compliance_rate": "100.0%",
+    "last_checkin": "None recorded yet",
+    "history": []
+  },
+  "dress_code_audits": [
+    {
+      "date": "2026-10-29",
+      "evaluated_policy": "Academic Formals",
+      "status": "COMPLIANT",
+      "notes": "Upper body formal uniform guidelines satisfied."
+    }
+  ],
+  "security_alerts_and_flags": [],
+  "ai_autonomous_assessment": "Subject Dr. A. Sharma (FAC-102) holds verified biometric authorization. Attendance compliance is at 100.0%. All dress code and designated perimeter guidelines are in satisfactory standing."
+}

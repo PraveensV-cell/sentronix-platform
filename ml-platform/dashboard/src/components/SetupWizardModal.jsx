@@ -1,6 +1,37 @@
 import { useState, useEffect } from "react";
 import { createPeopleBatch, createCamera, assignCameraFunction } from "../api/api";
 
+const compressImage = (file) => {
+    return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (e) => {
+            const img = new Image();
+            img.src = e.target.result;
+            img.onload = () => {
+                const canvas = document.createElement("canvas");
+                let w = img.width;
+                let h = img.height;
+                const maxDim = 480;
+                if (w > h && w > maxDim) {
+                    h = Math.round((h * maxDim) / w);
+                    w = maxDim;
+                } else if (h > maxDim) {
+                    w = Math.round((w * maxDim) / h);
+                    h = maxDim;
+                }
+                canvas.width = w;
+                canvas.height = h;
+                const ctx = canvas.getContext("2d");
+                ctx.drawImage(img, 0, 0, w, h);
+                resolve(canvas.toDataURL("image/jpeg", 0.88));
+            };
+            img.onerror = () => resolve(e.target.result);
+        };
+        reader.onerror = () => resolve("");
+    });
+};
+
 const SAMPLE_CAMPUS_PROFILES = [
     {
         name: "Dr. Vikramaditya Sen",
@@ -381,6 +412,51 @@ export default function SetupWizardModal({ environment, isOpen, onClose, onCompl
                                         onChange={(e) => setPDress(e.target.value)}
                                         style={{ width: "100%", padding: "7px 10px", fontSize: "12px", borderRadius: "5px", border: "1px solid var(--border-color)" }}
                                     />
+                                </div>
+                            </div>
+
+                            {/* Photo Upload for Face Recognition */}
+                            <div style={{ marginBottom: "12px", padding: "10px", background: "var(--card-bg)", borderRadius: "6px", border: "1px dashed var(--border-color)" }}>
+                                <label className="fleet-stat-label">📷 Person Face Photo (Upload for AI Biometric Recognition)</label>
+                                <div style={{ display: "flex", alignItems: "center", gap: "12px", marginTop: "6px" }}>
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        id="wizard-person-photo-input"
+                                        style={{ display: "none" }}
+                                        onChange={async (e) => {
+                                            const file = e.target.files && e.target.files[0];
+                                            if (file) {
+                                                const compressed = await compressImage(file);
+                                                setPPhoto(compressed);
+                                            }
+                                        }}
+                                    />
+                                    <label
+                                        htmlFor="wizard-person-photo-input"
+                                        className="tool-btn btn-secondary-mini"
+                                        style={{ cursor: "pointer", padding: "6px 12px", fontSize: "11px", background: "rgba(212, 175, 55, 0.15)", color: "var(--text-primary)", border: "1px solid rgba(212, 175, 55, 0.3)", borderRadius: "4px", fontWeight: 700 }}
+                                    >
+                                        📁 Choose Face Image
+                                    </label>
+                                    {pPhoto ? (
+                                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                            <img
+                                                src={pPhoto}
+                                                alt="Preview"
+                                                style={{ width: "34px", height: "34px", borderRadius: "50%", objectFit: "cover", border: "2px solid #d4af37" }}
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => setPPhoto("")}
+                                                style={{ background: "transparent", border: "none", color: "#dc2626", fontSize: "11px", cursor: "pointer", fontWeight: 700 }}
+                                            >
+                                                ✕ Remove
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>Upload JPG, PNG or WEBP frontal face photo</span>
+                                    )}
                                 </div>
                             </div>
 

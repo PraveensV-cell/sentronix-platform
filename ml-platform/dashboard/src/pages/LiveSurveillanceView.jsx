@@ -1093,8 +1093,16 @@ export default function LiveSurveillanceView({ environment, systemOnline }) {
                                 ) : (
                                     people.slice(0, 10).map((p) => (
                                         <div key={p.id} className="roster-person-item">
-                                            <div className="person-avatar-circle">
-                                                {p.name.charAt(0).toUpperCase()}
+                                            <div className="person-avatar-circle" style={{ overflow: "hidden" }}>
+                                                {p.photo_url ? (
+                                                    <img
+                                                        src={p.photo_url}
+                                                        alt={p.name}
+                                                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                                                    />
+                                                ) : (
+                                                    p.name.charAt(0).toUpperCase()
+                                                )}
                                             </div>
                                             <div className="person-info-block">
                                                 <strong>{p.name}</strong>

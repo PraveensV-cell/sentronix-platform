@@ -12,6 +12,37 @@ import {
     deletePerson,
 } from "../api/api";
 
+const compressImage = (file) => {
+    return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (e) => {
+            const img = new Image();
+            img.src = e.target.result;
+            img.onload = () => {
+                const canvas = document.createElement("canvas");
+                let w = img.width;
+                let h = img.height;
+                const maxDim = 480;
+                if (w > h && w > maxDim) {
+                    h = Math.round((h * maxDim) / w);
+                    w = maxDim;
+                } else if (h > maxDim) {
+                    w = Math.round((w * maxDim) / h);
+                    h = maxDim;
+                }
+                canvas.width = w;
+                canvas.height = h;
+                const ctx = canvas.getContext("2d");
+                ctx.drawImage(img, 0, 0, w, h);
+                resolve(canvas.toDataURL("image/jpeg", 0.88));
+            };
+            img.onerror = () => resolve(e.target.result);
+        };
+        reader.onerror = () => resolve("");
+    });
+};
+
 export default function PeopleView({ environment }) {
     const [people, setPeople] = useState([]);
     const [filterRole, setFilterRole] = useState("ALL");
@@ -21,6 +52,12 @@ export default function PeopleView({ environment }) {
     const [personHistory, setPersonHistory] = useState([]);
     const [loadingHistory, setLoadingHistory] = useState(false);
     const [feedbackMsg, setFeedbackMsg] = useState("");
+
+    // Biometric Face Enrollment Modal
+    const [showEnrollModal, setShowEnrollModal] = useState(false);
+    const [enrollPersonTarget, setEnrollPersonTarget] = useState(null);
+    const [enrollPhoto, setEnrollPhoto] = useState("");
+    const [isEnrolling, setIsEnrolling] = useState(false);
 
     // Dossier Modal
     const [dossierData, setDossierData] = useState(null);
@@ -36,6 +73,7 @@ export default function PeopleView({ environment }) {
     const [newDress, setNewDress] = useState("Formals & Regular Uniform");
     const [newPhone, setNewPhone] = useState("");
     const [newEmail, setNewEmail] = useState("");
+    const [newPhoto, setNewPhoto] = useState("");
 
     // Edit person form state
     const [editFormData, setEditFormData] = useState({
@@ -48,6 +86,7 @@ export default function PeopleView({ environment }) {
         status: "active",
         phone: "",
         email: "",
+        photo_url: "",
     });
 
     const loadPeople = async () => {
@@ -80,6 +119,7 @@ export default function PeopleView({ environment }) {
                 allowed_dress: newDress,
                 phone: newPhone,
                 email: newEmail,
+                photo_url: newPhoto || undefined,
                 environment_id: environment?.id || 1,
             });
 
@@ -89,7 +129,8 @@ export default function PeopleView({ environment }) {
                 setNewIdentifier("");
                 setNewPhone("");
                 setNewEmail("");
-                showToast(`✓ Registered ${newName}. Profile and AI dossier created.`);
+                setNewPhoto("");
+                showToast(`✓ Registered ${newName}. Face photo enrolled & AI dossier created.`);
                 await loadPeople();
             }
         } catch (err) {
@@ -109,6 +150,7 @@ export default function PeopleView({ environment }) {
             status: person.status || "active",
             phone: person.phone || "",
             email: person.email || "",
+            photo_url: person.photo_url || "",
         });
 
         // Load individual records table
@@ -136,6 +178,36 @@ export default function PeopleView({ environment }) {
             }
         } catch (err) {
             alert(err.response?.data?.detail || "Failed to save profile changes");
+        }
+    };
+
+    // Open Face Biometric Enrollment Modal
+    const handleOpenEnrollModal = (person) => {
+        setEnrollPersonTarget(person);
+        setEnrollPhoto(person.photo_url || "");
+        setShowEnrollModal(true);
+    };
+
+    const handleSaveEnrollPhoto = async () => {
+        if (!enrollPersonTarget) return;
+        if (!enrollPhoto) {
+            alert("Please upload or choose a face photo to enroll.");
+            return;
+        }
+        setIsEnrolling(true);
+        try {
+            const res = await enrollPersonFace(enrollPersonTarget.id, { photo_url: enrollPhoto });
+            if (res.success) {
+                showToast(`✓ Face biometrics and image updated for ${enrollPersonTarget.name}`);
+                setShowEnrollModal(false);
+                setEnrollPersonTarget(null);
+                setEnrollPhoto("");
+                await loadPeople();
+            }
+        } catch (err) {
+            alert(err.response?.data?.detail || "Face enrollment failed");
+        } finally {
+            setIsEnrolling(false);
         }
     };
 
@@ -197,18 +269,6 @@ export default function PeopleView({ environment }) {
             }
         } catch (err) {
             alert("Failed to mark attendance");
-        }
-    };
-
-    const handleEnrollFace = async (person) => {
-        try {
-            const res = await enrollPersonFace(person.id);
-            if (res.success) {
-                showToast(`✓ Face biometric features enrolled for ${person.name}`);
-                await loadPeople();
-            }
-        } catch (err) {
-            alert("Face enrollment failed");
         }
     };
 
@@ -317,7 +377,16 @@ export default function PeopleView({ environment }) {
                         return (
                             <div key={p.id} className="person-profile-card">
                                 <div className="profile-header">
-                                    <div className="avatar-large">{p.name.charAt(0)}</div>
+                                    {p.photo_url ? (
+                                        <img
+                                            src={p.photo_url}
+                                            alt={p.name}
+                                            className="avatar-large"
+                                            style={{ width: "44px", height: "44px", borderRadius: "50%", objectFit: "cover", border: "2px solid #d4af37", boxShadow: "0 2px 6px rgba(0,0,0,0.15)" }}
+                                        />
+                                    ) : (
+                                        <div className="avatar-large">{p.name.charAt(0).toUpperCase()}</div>
+                                    )}
                                     <div className="profile-meta">
                                         <h3 className="person-card-name">{p.name}</h3>
                                         <span className="profile-id">{p.identifier}</span>
@@ -375,19 +444,29 @@ export default function PeopleView({ environment }) {
                                         {!isEnrolled ? (
                                             <button
                                                 className="tool-btn btn-primary"
-                                                onClick={() => handleEnrollFace(p)}
-                                                style={{ fontSize: "11px" }}
+                                                onClick={() => handleOpenEnrollModal(p)}
+                                                style={{ fontSize: "11px", background: "linear-gradient(135deg, #d4af37 0%, #b8860b 100%)", color: "#0c1017", fontWeight: 700 }}
                                             >
-                                                📷 Enroll
+                                                📷 Enroll Photo
                                             </button>
                                         ) : (
-                                            <button
-                                                className="tool-btn btn-secondary-mini"
-                                                onClick={() => handleMarkPresent(p.id, p.name)}
-                                                style={{ fontSize: "11px" }}
-                                            >
-                                                ✓ Check-in
-                                            </button>
+                                            <div style={{ display: "flex", gap: "4px" }}>
+                                                <button
+                                                    className="tool-btn btn-secondary-mini"
+                                                    onClick={() => handleOpenEnrollModal(p)}
+                                                    style={{ fontSize: "11px", padding: "4px 8px" }}
+                                                    title="Change or re-upload face photo"
+                                                >
+                                                    📷 Photo
+                                                </button>
+                                                <button
+                                                    className="tool-btn btn-secondary-mini"
+                                                    onClick={() => handleMarkPresent(p.id, p.name)}
+                                                    style={{ fontSize: "11px", padding: "4px 8px" }}
+                                                >
+                                                    ✓ Check-in
+                                                </button>
+                                            </div>
                                         )}
                                     </div>
                                 </div>
@@ -444,12 +523,21 @@ export default function PeopleView({ environment }) {
                             <div style={{ padding: "20px 24px", maxHeight: "70vh", overflowY: "auto" }}>
                                 {/* Profile Credentials Grid */}
                                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "18px" }}>
-                                    <div style={{ padding: "14px", background: "var(--bg-secondary)", borderRadius: "8px", border: "1px solid var(--border-color)" }}>
-                                        <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase" }}>Personal Biometric Credentials</div>
-                                        <div style={{ fontSize: "14px", fontWeight: 700, marginTop: "6px" }}>{dossierData.person_details.name}</div>
-                                        <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "2px" }}>ID: {dossierData.person_details.identifier} • Role: {dossierData.person_details.role.toUpperCase()}</div>
-                                        <div style={{ fontSize: "12px", color: "var(--text-secondary)" }}>Dept: {dossierData.person_details.department} • Grade: {dossierData.person_details.class_grade}</div>
-                                        <div style={{ fontSize: "12px", marginTop: "4px" }}>Allowed Dress: <strong className="text-primary">{dossierData.person_details.allowed_dress}</strong></div>
+                                    <div style={{ padding: "14px", background: "var(--bg-secondary)", borderRadius: "8px", border: "1px solid var(--border-color)", display: "flex", gap: "14px" }}>
+                                        {dossierData.person_details.photo_url ? (
+                                            <img
+                                                src={dossierData.person_details.photo_url}
+                                                alt={dossierData.person_details.name}
+                                                style={{ width: "64px", height: "64px", borderRadius: "8px", objectFit: "cover", border: "2px solid #d4af37", alignSelf: "flex-start" }}
+                                            />
+                                        ) : null}
+                                        <div>
+                                            <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase" }}>Personal Biometric Credentials</div>
+                                            <div style={{ fontSize: "14px", fontWeight: 700, marginTop: "4px" }}>{dossierData.person_details.name}</div>
+                                            <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "2px" }}>ID: {dossierData.person_details.identifier} • Role: {dossierData.person_details.role.toUpperCase()}</div>
+                                            <div style={{ fontSize: "12px", color: "var(--text-secondary)" }}>Dept: {dossierData.person_details.department} • Grade: {dossierData.person_details.class_grade}</div>
+                                            <div style={{ fontSize: "12px", marginTop: "4px" }}>Allowed Dress: <strong className="text-primary">{dossierData.person_details.allowed_dress}</strong></div>
+                                        </div>
                                     </div>
 
                                     <div style={{ padding: "14px", background: "var(--bg-secondary)", borderRadius: "8px", border: "1px solid var(--border-color)" }}>
@@ -571,6 +659,47 @@ export default function PeopleView({ environment }) {
                                         style={{ width: "100%", padding: "7px 10px", fontSize: "12px", border: "1px solid var(--border-color)", borderRadius: "4px" }}
                                     />
                                 </div>
+
+                                {/* Photo Upload & Change in Edit Modal */}
+                                <div>
+                                    <label className="fleet-stat-label">Person Face Photo</label>
+                                    <div style={{ display: "flex", alignItems: "center", gap: "12px", marginTop: "4px" }}>
+                                        {editFormData.photo_url ? (
+                                            <img
+                                                src={editFormData.photo_url}
+                                                alt="Profile"
+                                                style={{ width: "44px", height: "44px", borderRadius: "50%", objectFit: "cover", border: "2px solid #d4af37" }}
+                                            />
+                                        ) : (
+                                            <div style={{ width: "44px", height: "44px", borderRadius: "50%", border: "1px dashed var(--border-color)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px" }}>
+                                                👤
+                                            </div>
+                                        )}
+                                        <div>
+                                            <input
+                                                type="file"
+                                                accept="image/*"
+                                                id="edit-person-photo-input"
+                                                style={{ display: "none" }}
+                                                onChange={async (e) => {
+                                                    const file = e.target.files && e.target.files[0];
+                                                    if (file) {
+                                                        const compressed = await compressImage(file);
+                                                        setEditFormData((prev) => ({ ...prev, photo_url: compressed }));
+                                                    }
+                                                }}
+                                            />
+                                            <label
+                                                htmlFor="edit-person-photo-input"
+                                                className="tool-btn btn-secondary-mini"
+                                                style={{ cursor: "pointer", padding: "5px 12px", fontSize: "11px", border: "1px solid var(--border-color)", borderRadius: "4px", fontWeight: 600 }}
+                                            >
+                                                📁 Change Photo
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+
                                 <div>
                                     <label className="fleet-stat-label">Phone &amp; Email</label>
                                     <div style={{ display: "flex", gap: "8px" }}>
@@ -643,6 +772,95 @@ export default function PeopleView({ environment }) {
                 </div>
             )}
 
+            {/* ── Biometric Face Enrollment Modal ── */}
+            {showEnrollModal && enrollPersonTarget && (
+                <div className="modal-overlay" onClick={() => setShowEnrollModal(false)}>
+                    <div className="modal-dialog" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "460px" }}>
+                        <div className="modal-header">
+                            <div>
+                                <h3 style={{ margin: 0, fontSize: "15px", fontWeight: 700 }}>
+                                    📷 Biometric Face Enrollment
+                                </h3>
+                                <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>
+                                    {enrollPersonTarget.name} ({enrollPersonTarget.identifier})
+                                </span>
+                            </div>
+                            <button className="tool-btn btn-secondary-mini" onClick={() => setShowEnrollModal(false)}>✕</button>
+                        </div>
+                        <div style={{ padding: "20px" }}>
+                            <p style={{ margin: "0 0 16px 0", fontSize: "12px", color: "var(--text-secondary)" }}>
+                                Upload a clear frontal portrait photo of this individual. The Sentronix AI neural vision engine will extract facial embeddings for automatic biometric recognition, dress code checks, and attendance logging.
+                            </p>
+
+                            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "12px", padding: "16px", background: "var(--bg-secondary)", borderRadius: "8px", border: "1px dashed var(--border-color)" }}>
+                                {enrollPhoto ? (
+                                    <div style={{ position: "relative" }}>
+                                        <img
+                                            src={enrollPhoto}
+                                            alt="Preview"
+                                            style={{ width: "90px", height: "90px", borderRadius: "50%", objectFit: "cover", border: "3px solid #d4af37", boxShadow: "0 4px 14px rgba(0,0,0,0.25)" }}
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setEnrollPhoto("")}
+                                            style={{ position: "absolute", top: "-4px", right: "-4px", background: "#ef4444", color: "#fff", border: "none", borderRadius: "50%", width: "22px", height: "22px", fontSize: "12px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+                                            title="Clear Photo"
+                                        >
+                                            ✕
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div style={{ width: "90px", height: "90px", borderRadius: "50%", border: "2px dashed var(--border-color)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "36px", color: "var(--text-muted)", background: "var(--card-bg)" }}>
+                                        👤
+                                    </div>
+                                )}
+
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    id="enroll-modal-photo-file"
+                                    style={{ display: "none" }}
+                                    onChange={async (e) => {
+                                        const file = e.target.files && e.target.files[0];
+                                        if (file) {
+                                            const compressed = await compressImage(file);
+                                            setEnrollPhoto(compressed);
+                                        }
+                                    }}
+                                />
+                                <label
+                                    htmlFor="enroll-modal-photo-file"
+                                    className="tool-btn btn-secondary-mini"
+                                    style={{ cursor: "pointer", padding: "8px 18px", fontSize: "12px", background: "rgba(212, 175, 55, 0.15)", color: "var(--text-primary)", border: "1px solid rgba(212, 175, 55, 0.35)", borderRadius: "6px", fontWeight: 700 }}
+                                >
+                                    📁 Choose Face Photo from Computer
+                                </label>
+                                {enrollPhoto && (
+                                    <span style={{ fontSize: "11px", color: "var(--success-color)", fontWeight: 700 }}>
+                                        ✓ Photo loaded and ready to encode
+                                    </span>
+                                )}
+                            </div>
+
+                            <div className="modal-actions" style={{ marginTop: "20px" }}>
+                                <button type="button" className="tool-btn btn-secondary-mini" onClick={() => setShowEnrollModal(false)}>
+                                    Cancel
+                                </button>
+                                <button
+                                    type="button"
+                                    className="tool-btn btn-primary"
+                                    onClick={handleSaveEnrollPhoto}
+                                    disabled={isEnrolling || !enrollPhoto}
+                                    style={{ opacity: isEnrolling || !enrollPhoto ? 0.6 : 1 }}
+                                >
+                                    {isEnrolling ? "Extracting Embeddings..." : "Save & Enroll Face"}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* ── Add Person Modal ── */}
             {showAddModal && (
                 <div className="modal-overlay" onClick={() => setShowAddModal(false)}>
@@ -696,6 +914,62 @@ export default function PeopleView({ environment }) {
                                     style={{ width: "100%", padding: "8px 12px", fontSize: "13px" }}
                                 />
                             </div>
+
+                            {/* Photo Upload Section for Manual Registration */}
+                            <div style={{ padding: "12px", background: "var(--bg-secondary)", borderRadius: "8px", border: "1px dashed var(--border-color)", marginTop: "4px" }}>
+                                <label className="fleet-stat-label" style={{ display: "block", marginBottom: "6px" }}>
+                                    📷 Person Face Photo (Upload for AI Biometric Recognition)
+                                </label>
+                                <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+                                    {newPhoto ? (
+                                        <div style={{ position: "relative" }}>
+                                            <img
+                                                src={newPhoto}
+                                                alt="Preview"
+                                                style={{ width: "52px", height: "52px", borderRadius: "50%", objectFit: "cover", border: "2px solid #d4af37", boxShadow: "0 2px 8px rgba(0,0,0,0.2)" }}
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => setNewPhoto("")}
+                                                style={{ position: "absolute", top: "-4px", right: "-4px", background: "#ef4444", color: "#fff", border: "none", borderRadius: "50%", width: "18px", height: "18px", fontSize: "10px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+                                                title="Remove photo"
+                                            >
+                                                ✕
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <div style={{ width: "52px", height: "52px", borderRadius: "50%", border: "2px dashed var(--border-color)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px", color: "var(--text-muted)", background: "var(--card-bg)" }}>
+                                            👤
+                                        </div>
+                                    )}
+                                    <div style={{ flex: 1 }}>
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            id="add-person-photo-file"
+                                            style={{ display: "none" }}
+                                            onChange={async (e) => {
+                                                const file = e.target.files && e.target.files[0];
+                                                if (file) {
+                                                    const compressed = await compressImage(file);
+                                                    setNewPhoto(compressed);
+                                                }
+                                            }}
+                                        />
+                                        <label
+                                            htmlFor="add-person-photo-file"
+                                            className="tool-btn btn-secondary-mini"
+                                            style={{ display: "inline-block", cursor: "pointer", padding: "6px 14px", fontSize: "12px", background: "rgba(212, 175, 55, 0.15)", color: "var(--text-primary)", border: "1px solid rgba(212, 175, 55, 0.3)", borderRadius: "6px", fontWeight: 600 }}
+                                        >
+                                            📁 Choose Face Photo
+                                        </label>
+                                        <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "4px" }}>
+                                            {newPhoto ? "✓ Photo loaded for automatic biometric match" : "PNG, JPG, or WEBP supported"}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
                             <div className="modal-actions">
                                 <button type="button" className="tool-btn btn-secondary-mini" onClick={() => setShowAddModal(false)}>Cancel</button>
                                 <button type="submit" className="tool-btn btn-primary">Create Profile &amp; AI Dossier</button>

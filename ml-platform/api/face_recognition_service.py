@@ -100,6 +100,7 @@ def enroll_person_embedding(person_id: int, image_data: bytes) -> bool:
     conn = get_db()
     try:
         embedding_json = json.dumps(feat.tolist())
+        conn.execute("DELETE FROM face_embeddings WHERE person_id = ?", (person_id,))
         conn.execute(
             """
             INSERT INTO face_embeddings (person_id, embedding_json, feature_version)

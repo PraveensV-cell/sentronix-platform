@@ -1,6 +1,37 @@
 import { useState, useEffect } from "react";
 import { createPeopleBatch, createCamera } from "../api/api";
 
+const compressImage = (file) => {
+    return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (e) => {
+            const img = new Image();
+            img.src = e.target.result;
+            img.onload = () => {
+                const canvas = document.createElement("canvas");
+                let w = img.width;
+                let h = img.height;
+                const maxDim = 480;
+                if (w > h && w > maxDim) {
+                    h = Math.round((h * maxDim) / w);
+                    w = maxDim;
+                } else if (h > maxDim) {
+                    w = Math.round((w * maxDim) / h);
+                    h = maxDim;
+                }
+                canvas.width = w;
+                canvas.height = h;
+                const ctx = canvas.getContext("2d");
+                ctx.drawImage(img, 0, 0, w, h);
+                resolve(canvas.toDataURL("image/jpeg", 0.88));
+            };
+            img.onerror = () => resolve(e.target.result);
+        };
+        reader.onerror = () => resolve("");
+    });
+};
+
 const DATASET_TEMPLATES = {
     School: {
         category: "Academic & Campus Roster",
@@ -274,8 +305,17 @@ export default function OnboardingFlowModal({ environment, isOpen, onClose, onLa
                                         peopleList.map((p, idx) => (
                                             <tr key={idx} style={{ borderBottom: "1px solid rgba(255,255,255,0.04)", color: "#f8fafc" }}>
                                                 <td style={{ padding: "8px 12px" }}>
-                                                    <strong>{p.name}</strong>
-                                                    <div style={{ fontSize: "10px", color: "#94a3b8" }}>{p.identifier}</div>
+                                                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                                        <img
+                                                            src={p.photo_url || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop"}
+                                                            alt={p.name}
+                                                            style={{ width: "28px", height: "28px", borderRadius: "50%", objectFit: "cover", border: "1px solid rgba(212,175,55,0.4)" }}
+                                                        />
+                                                        <div>
+                                                            <strong>{p.name}</strong>
+                                                            <div style={{ fontSize: "10px", color: "#94a3b8" }}>{p.identifier}</div>
+                                                        </div>
+                                                    </div>
                                                 </td>
                                                 <td style={{ padding: "8px 12px" }}>
                                                     <span style={{ fontSize: "10px", background: "rgba(212,175,55,0.15)", color: "#d4af37", padding: "2px 8px", borderRadius: "10px", fontWeight: 700 }}>
@@ -376,14 +416,11 @@ export default function OnboardingFlowModal({ environment, isOpen, onClose, onLa
                                     <input
                                         type="file"
                                         accept="image/*"
-                                        onChange={(e) => {
+                                        onChange={async (e) => {
                                             const file = e.target.files && e.target.files[0];
                                             if (file) {
-                                                const reader = new FileReader();
-                                                reader.onload = (ev) => {
-                                                    setPhotoUrl(ev.target.result);
-                                                };
-                                                reader.readAsDataURL(file);
+                                                const compressed = await compressImage(file);
+                                                setPhotoUrl(compressed);
                                             }
                                         }}
                                         style={{ fontSize: "11px", color: "#cbd5e1" }}
@@ -395,7 +432,14 @@ export default function OnboardingFlowModal({ environment, isOpen, onClose, onLa
                                                 alt="Enrolled Face"
                                                 style={{ width: "36px", height: "36px", borderRadius: "50%", objectFit: "cover", border: "2px solid #d4af37" }}
                                             />
-                                            <span style={{ fontSize: "11px", color: "#10b981", fontWeight: 700 }}>✓ Photo Loaded for AI Matching</span>
+                                            <button
+                                                type="button"
+                                                onClick={() => setPhotoUrl("")}
+                                                style={{ background: "transparent", border: "none", color: "#f87171", fontSize: "11px", cursor: "pointer", fontWeight: 700 }}
+                                            >
+                                                ✕ Remove
+                                            </button>
+                                            <span style={{ fontSize: "11px", color: "#10b981", fontWeight: 700 }}>✓ Photo Ready</span>
                                         </div>
                                     )}
                                 </div>
