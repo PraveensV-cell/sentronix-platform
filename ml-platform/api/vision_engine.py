@@ -125,24 +125,30 @@ def process_frame(
 
     # 3. Fetch Registered Enrolled People from Database
     conn = None
-    enrolled_people = []
     try:
         conn = get_db_connection()
-        rows = conn.execute(
+        conn.execute(
             "SELECT id, identifier, name, role, department, class_grade, allowed_dress, is_enrolled FROM people WHERE is_enrolled = 1 LIMIT 10"
         ).fetchall()
-        enrolled_people = [dict(r) for r in rows]
     except Exception as e:
         print(f"[VisionEngine] DB fetch people error: {e}")
 
-    # Determine matched person or Unknown
+    # True Facial Verification (Only assign identity if similarity >= 0.70 threshold)
     matched_person: Optional[dict] = None
-    if len(detected_faces) > 0 or any(d["name"] == "person" for d in detected_objects):
-        if len(enrolled_people) > 0:
-            # Matches top enrolled person profile
-            matched_person = enrolled_people[0]
-        else:
-            matched_person = None
+
+    try:
+        from api.face_recognition_service import analyze_surveillance_frame
+
+        analysis = analyze_surveillance_frame(
+            frame=frame,
+            environment_id=1,
+            assigned_function=assigned_function,
+        )
+        if analysis.get("is_match") and analysis.get("matched_person"):
+            matched_person = analysis["matched_person"]
+    except Exception as e:
+        print(f"[VisionEngine] Face matching error: {e}")
+        matched_person = None
 
     func_upper = assigned_function.upper()
     has_person = (

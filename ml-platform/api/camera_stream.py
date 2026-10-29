@@ -1,3 +1,4 @@
+from datetime import datetime
 import os
 import socket
 import sqlite3
@@ -268,7 +269,10 @@ def get_network_info():
 
 @router.post("/{camera_id}/upload-frame")
 async def upload_camera_frame(camera_id: str, file: UploadFile = File(...)):
-    """Accepts live video frames sent from mobile phones or remote webcams."""
+    """
+    Accepts live video frames from webcam or mobile devices,
+    runs full facial recognition, dress code + ID card verification, and returns real analysis.
+    """
     str_id = str(camera_id)
     contents = await file.read()
     nparr = np.frombuffer(contents, np.uint8)
@@ -279,19 +283,79 @@ async def upload_camera_frame(camera_id: str, file: UploadFile = File(...)):
             status_code=400, detail="Invalid image payload received from device"
         )
 
-    # Store frame in mobile frame cache
+    # Store frame in frame cache
     mobile_uploaded_frames[str_id] = {
         "frame": frame,
         "timestamp": time.time(),
     }
+
+    # Get camera settings (assigned function & environment)
+    assigned_function = "FACE_ATTENDANCE"
+    environment_id = 1
+    try:
+        conn = get_db_connection()
+        row = conn.execute(
+            "SELECT environment_id, assigned_function FROM cameras WHERE id = ?",
+            (str_id,),
+        ).fetchone()
+        if row:
+            if row["assigned_function"]:
+                assigned_function = row["assigned_function"]
+            if row["environment_id"]:
+                environment_id = row["environment_id"]
+        conn.close()
+    except Exception:
+        pass
+
+    # Run Real Face Recognition & Perception
+    from api.face_recognition_service import analyze_surveillance_frame
+
+    analysis = analyze_surveillance_frame(
+        frame=frame,
+        environment_id=environment_id,
+        assigned_function=assigned_function,
+    )
+
+    # If verified face match on Attendance function, mark present
+    if analysis.get("is_match") and analysis.get("matched_person"):
+        p_id = analysis["matched_person"]["id"]
+        try:
+            conn = get_db_connection()
+            today_str = datetime.now().strftime("%Y-%m-%d")
+            existing = conn.execute(
+                "SELECT id FROM attendance_records WHERE person_id = ? AND timestamp LIKE ?",
+                (p_id, f"{today_str}%"),
+            ).fetchone()
+            if not existing:
+                now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                status = "LATE" if datetime.now().hour >= 9 else "PRESENT"
+                conn.execute(
+                    """
+                    INSERT INTO attendance_records (person_id, camera_id, environment_id, timestamp, confidence, status)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        p_id,
+                        int(camera_id) if camera_id.isdigit() else 1,
+                        environment_id,
+                        now_str,
+                        analysis["similarity"],
+                        status,
+                    ),
+                )
+                conn.commit()
+            conn.close()
+        except Exception as e:
+            print(f"[CameraStream] Attendance recording error: {e}")
 
     # Ensure worker thread is initialized
     get_camera(str_id)
 
     return {
         "success": True,
-        "message": f"Frame received for Camera {camera_id}",
+        "message": f"Frame analyzed for Camera {camera_id}",
         "dimensions": f"{frame.shape[1]}x{frame.shape[0]}",
+        "analysis": analysis,
     }
 
 

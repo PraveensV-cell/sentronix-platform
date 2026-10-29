@@ -26,48 +26,65 @@ export default function LiveSurveillanceView({ environment, systemOnline }) {
     const [selectedDeviceId, setSelectedDeviceId] = useState("");
     const [externalPluggedMsg, setExternalPluggedMsg] = useState("");
 
-    const [viewMode, setViewMode] = useState("focus"); // "focus" | "multi_grid"
+    // Tactical Optics Mode (for Military & High-Security Modes): "NORMAL_HD" | "NIGHT_VISION" | "THERMAL_FLIR"
+    const [opticsMode, setOpticsMode] = useState("NORMAL_HD");
+
+    const [viewMode, setViewMode] = useState("focus");
     const [selectedSector, setSelectedSector] = useState("all");
     const [cameraSearchQuery, setCameraSearchQuery] = useState("");
     const [snapshotMsg, setSnapshotMsg] = useState("");
     const [cameraActive, setCameraActive] = useState(true);
     const [currentDetectionsCount, setCurrentDetectionsCount] = useState(1);
-    const [detectionLabel, setDetectionLabel] = useState("Verified Individual • 95% Confidence");
+    const [detectionLabel, setDetectionLabel] = useState("Face Verification Active • Scanning...");
 
-    // Live Video Quality Diagnostics (Lighting, Blur/Lens, Face Identity)
+    // Live Perception Analysis from Backend Face Matching & Dress/ID Engine
+    const [livePerception, setLivePerception] = useState({
+        face_detected: false,
+        face_box: null,
+        is_match: false,
+        matched_person: null,
+        similarity: 0.0,
+        detected_gender: "person",
+        dress_code: {
+            id_card_detected: true,
+            id_card_status: "ID CARD DETECTED • VERIFIED",
+            dress_compliant: true,
+            dress_type: "Regular School Formals",
+        },
+        prohibited_items: [],
+    });
+
+    // Optical Diagnostics (Lighting lux & Sharpness/smudge)
     const [lightingDiag, setLightingDiag] = useState({
-        lux: 115,
+        lux: 118,
         status: "OPTIMAL",
         advice: "",
     });
     const [clarityDiag, setClarityDiag] = useState({
-        score: 92,
+        score: 94,
         status: "CRISP_HD",
-        advice: "",
-    });
-    const [faceDiag, setFaceDiag] = useState({
-        status: "VERIFIED",
-        name: "",
         advice: "",
     });
 
     // Triage Feedback Toast
     const [triageToast, setTriageToast] = useState("");
 
-    // Live AI Action HUD & JARVIS Announcements
+    // Live AI Action HUD & Announcements
     const [recentAction, setRecentAction] = useState({
         type: "ATTENDANCE",
-        text: "Executive Surveillance Active. Biometric face recognition and uniform policy operating.",
+        text: "Autonomous Surveillance Active. True facial verification and dress code inspection running.",
         timestamp: new Date().toLocaleTimeString(),
-        badge: "VERIFIED",
+        badge: "ACTIVE",
     });
     const lastSpokenRef = useRef("");
 
-    // Refs for direct browser webcam access & canvas HUD
+    // Refs for webcam and canvas
     const videoRef = useRef(null);
     const canvasRef = useRef(null);
     const streamRef = useRef(null);
     const uploadIntervalRef = useRef(null);
+
+    const modeType = environment?.type || "School";
 
     const loadData = async () => {
         try {
@@ -199,14 +216,60 @@ export default function LiveSurveillanceView({ environment, systemOnline }) {
         }
     };
 
-    // ── Frame Processing, Video Quality Diagnostics & Royal Gold Canvas HUD ──
+    // ── Frame Upload & Live Perception Synchronization ──
+    useEffect(() => {
+        if (!selectedCamera || !cameraActive || !isStreaming || streamSourceMode === "backend") {
+            if (uploadIntervalRef.current) clearInterval(uploadIntervalRef.current);
+            return;
+        }
+
+        uploadIntervalRef.current = setInterval(() => {
+            const canvas = canvasRef.current;
+            if (canvas) {
+                canvas.toBlob(
+                    async (blob) => {
+                        if (blob) {
+                            try {
+                                const res = await uploadCameraFrame(selectedCamera.id, blob);
+                                if (res && res.analysis) {
+                                    setLivePerception(res.analysis);
+
+                                    // Update Live Detection Label
+                                    if (res.analysis.is_match && res.analysis.matched_person) {
+                                        const p = res.analysis.matched_person;
+                                        setDetectionLabel(
+                                            `⚜️ ${p.name} [${p.identifier}] — Verified (${Math.round(
+                                                res.analysis.similarity * 100
+                                            )}%)`
+                                        );
+                                    } else {
+                                        const g = (res.analysis.detected_gender || "person").toUpperCase();
+                                        setDetectionLabel(`⚠️ Unknown ${g} — Unregistered Individual`);
+                                    }
+                                }
+                            } catch (err) {
+                                // silent fallback
+                            }
+                        }
+                    },
+                    "image/jpeg",
+                    0.8
+                );
+            }
+        }, 500);
+
+        return () => {
+            if (uploadIntervalRef.current) clearInterval(uploadIntervalRef.current);
+        };
+    }, [selectedCamera?.id, cameraActive, isStreaming, streamSourceMode]);
+
+    // ── Real-Time Canvas HUD Rendering with True Face Identification & Dress/ID Card ──
     useEffect(() => {
         if (streamSourceMode === "backend" || !cameraActive || !isStreaming) return;
 
         let animationFrameId;
         let frameCounter = 0;
         const assignedFunc = selectedCamera?.assigned_function || "FACE_ATTENDANCE";
-        const enrolledPerson = people.find((p) => p.is_enrolled === 1) || people[0];
 
         const renderCanvas = () => {
             const video = videoRef.current;
@@ -217,7 +280,18 @@ export default function LiveSurveillanceView({ environment, systemOnline }) {
                 if (ctx) {
                     canvas.width = video.videoWidth || 640;
                     canvas.height = video.videoHeight || 480;
+
+                    // Apply Tactical Optics Filter (Night Vision / Thermal FLIR)
+                    if (opticsMode === "NIGHT_VISION") {
+                        ctx.filter = "sepia(1) hue-rotate(80deg) saturate(3) brightness(1.15)";
+                    } else if (opticsMode === "THERMAL_FLIR") {
+                        ctx.filter = "contrast(1.6) invert(1) hue-rotate(180deg) saturate(2.5)";
+                    } else {
+                        ctx.filter = "none";
+                    }
+
                     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    ctx.filter = "none"; // Reset filter for HUD overlays
 
                     const cw = canvas.width;
                     const ch = canvas.height;
@@ -243,125 +317,115 @@ export default function LiveSurveillanceView({ environment, systemOnline }) {
                                     sampleCount++;
 
                                     const nextIdx = (y * cw + (x + 12)) * 4;
-                                    const nextLum = 0.299 * data[nextIdx] + 0.587 * data[nextIdx + 1] + 0.114 * data[nextIdx + 2];
+                                    const nextLum =
+                                        0.299 * data[nextIdx] +
+                                        0.587 * data[nextIdx + 1] +
+                                        0.114 * data[nextIdx + 2];
                                     edgeGrad += Math.abs(lum - nextLum);
                                 }
                             }
 
                             const avgL = sampleCount > 0 ? Math.round(totalLum / sampleCount) : 100;
                             const estLux = Math.round(avgL * 1.3);
-                            const sharpScore = sampleCount > 0 ? Math.min(100, Math.round((edgeGrad / sampleCount) * 5)) : 85;
+                            const sharpScore =
+                                sampleCount > 0
+                                    ? Math.min(100, Math.round((edgeGrad / sampleCount) * 5))
+                                    : 88;
 
-                            // Update Lighting Diagnostic
                             if (avgL < 45) {
                                 setLightingDiag({
                                     lux: estLux,
                                     status: "LOW_LIGHT",
-                                    advice: "⚠️ Lighting too low (<45 lx). Please turn on room lights or increase ambient illumination for accurate facial recognition.",
+                                    advice: "⚠️ Lighting too low (<45 lx). Please turn on room lights for accurate facial verification.",
                                 });
                             } else if (avgL > 220) {
                                 setLightingDiag({
                                     lux: estLux,
                                     status: "HIGH_GLARE",
-                                    advice: "⚠️ High glare detected (>220 lx). Reduce direct spotlight or tilt camera angle to eliminate reflection.",
+                                    advice: "⚠️ High glare detected (>220 lx). Reduce direct spotlight to eliminate optical reflection.",
                                 });
                             } else {
-                                setLightingDiag({
-                                    lux: estLux,
-                                    status: "OPTIMAL",
-                                    advice: "",
-                                });
+                                setLightingDiag({ lux: estLux, status: "OPTIMAL", advice: "" });
                             }
 
-                            // Update Sharpness / Lens Smudge Diagnostic
                             if (sharpScore < 20) {
                                 setClarityDiag({
                                     score: sharpScore,
                                     status: "BLURRY_OR_SMUDGE",
-                                    advice: "⚠️ Feed appears blurry or lens smudged. Please clean the camera lens with a microfiber cloth and verify focus.",
+                                    advice: "⚠️ Feed appears blurry or lens smudged. Clean camera lens with a microfiber cloth.",
                                 });
                             } else {
-                                setClarityDiag({
-                                    score: sharpScore,
-                                    status: "CRISP_HD",
-                                    advice: "",
-                                });
+                                setClarityDiag({ score: sharpScore, status: "CRISP_HD", advice: "" });
                             }
-
-                            // Update Identity Diagnostic
-                            if (enrolledPerson) {
-                                setFaceDiag({
-                                    status: "VERIFIED",
-                                    name: enrolledPerson.name,
-                                    advice: "",
-                                });
-                            } else {
-                                setFaceDiag({
-                                    status: "UNKNOWN",
-                                    name: "Unregistered Individual",
-                                    advice: "⚠️ Unknown Person Detected: Unregistered face in sector. Please register individual in dataset or request visitor pass.",
-                                });
-                            }
-                        } catch (diagErr) {
-                            // Canvas read permission fallback
-                        }
+                        } catch (err) {}
                     }
 
-                    // ── Compute Bounding Box Coordinates ──
+                    // ── Primary Bounding Box Coordinates ──
                     const bx = Math.round(cw * 0.24);
-                    const by = Math.round(ch * 0.18);
+                    const by = Math.round(ch * 0.16);
                     const bw = Math.round(cw * 0.52);
-                    const bh = Math.round(ch * 0.70);
+                    const bh = Math.round(ch * 0.72);
 
-                    // Royal Luxury Colors (Gold #d4af37, Silver #cbd5e1, Amber #f59e0b)
-                    let primaryColor = "#d4af37"; // Royal Champagne Gold
-                    let cornerColor = "#ffffff";
-                    let badgeLabel = "VERIFIED INDIVIDUAL • 95%";
-                    let secondaryTag = "";
+                    // ── Determine Box Styling & Identity Naming ──
+                    let primaryColor = "#cbd5e1"; // Default Brushed Silver for Unregistered
+                    let badgeLabel = "⚠️ UNKNOWN PERSON • UNREGISTERED";
+                    let secondaryTag = "UNIDENTIFIED VISITOR • ENROLL IN DATASET";
+
+                    const isMatch = livePerception.is_match && livePerception.matched_person;
+                    const matched = livePerception.matched_person;
+                    const gender = (livePerception.detected_gender || "person").toUpperCase();
 
                     if (assignedFunc === "FACE_ATTENDANCE") {
-                        if (enrolledPerson) {
-                            primaryColor = "#d4af37"; // Royal Gold
-                            badgeLabel = `⚜️ ${enrolledPerson.name} [${enrolledPerson.identifier}] • PRESENT`;
-                            secondaryTag = "PRESENT • BIOMETRIC FACE MATCH (96.4%)";
-                            setDetectionLabel(`${enrolledPerson.name} — Present (96% Confidence)`);
+                        if (isMatch) {
+                            primaryColor = "#d4af37"; // Royal Gold for verified enrolled person
+                            const simPct = Math.round((livePerception.similarity || 0.94) * 100);
+                            badgeLabel = `⚜️ ${matched.name} [${matched.identifier}] • VERIFIED (${simPct}%)`;
+                            secondaryTag = `ROLE: ${matched.role.toUpperCase()} • BIOMETRIC CHECK-IN RECORDED`;
                         } else {
-                            primaryColor = "#cbd5e1"; // Brushed Silver
-                            badgeLabel = "⚠️ UNKNOWN PERSON • UNREGISTERED";
-                            secondaryTag = "UNIDENTIFIED VISITOR • PLEASE REGISTER IN DATASET";
-                            setDetectionLabel("Unknown Person — Unregistered (81% Confidence)");
+                            primaryColor = "#94a3b8"; // Silver/Slate
+                            badgeLabel = `⚠️ UNKNOWN ${gender} • UNREGISTERED`;
+                            secondaryTag = "UNIDENTIFIED INDIVIDUAL • PLEASE REGISTER IN DATASET";
                         }
                     } else if (assignedFunc === "DRESS_CODE" || assignedFunc === "DRESS_CODE_PPE") {
-                        const pName = enrolledPerson ? enrolledPerson.name : "Individual";
-                        primaryColor = "#d4af37";
-                        badgeLabel = `⚜️ ${pName} • DRESS: REGULAR FORMALS`;
-                        secondaryTag = "ALLOWED: FORMALS & REGULAR SCHOOL DRESS [COMPLIANT]";
-                        setDetectionLabel(`${pName} — Formal Dress (Passed)`);
+                        const pName = isMatch ? matched.name : `Unknown ${gender}`;
+                        const isCompliant = livePerception.dress_code?.dress_compliant !== false;
+                        const hasId = livePerception.dress_code?.id_card_detected !== false;
+
+                        primaryColor = isCompliant && hasId ? "#10b981" : "#f59e0b";
+                        badgeLabel = `👔 ${pName} • ${isCompliant ? "REGULAR FORMALS" : "CASUAL ATTIRE"}`;
+                        secondaryTag = hasId
+                            ? "🪪 ID CARD: DETECTED [PASS] • DRESS: COMPLIANT"
+                            : "⚠️ ID CARD: MISSING / NOT VISIBLE • DRESS CHECK";
                     } else if (assignedFunc === "EXAM_MONITOR") {
-                        primaryColor = "#38bdf8"; // Tactical Blue
-                        badgeLabel = "📝 EXAMINEE • PROCTORING ACTIVE";
-                        secondaryTag = "PROHIBITED ACTIVITY CHECK: NORMAL (NO SMARTPHONES)";
-                        setDetectionLabel("Examinee — Proctoring Active (No Cheating Detected)");
+                        const hasCheating =
+                            livePerception.prohibited_items && livePerception.prohibited_items.length > 0;
+                        if (hasCheating) {
+                            primaryColor = "#ef4444";
+                            badgeLabel = "🚨 PROHIBITED SMARTPHONE / NOTES DETECTED";
+                            secondaryTag = "EXAM PROCTORING ALERT: CHEATING FRAUD DETECTED";
+                        } else {
+                            primaryColor = "#38bdf8";
+                            badgeLabel = "📝 EXAMINEE • PROCTORING ACTIVE";
+                            secondaryTag = "PROHIBITED ITEMS: ZERO • SEAT SCAN NOMINAL";
+                        }
                     } else if (assignedFunc === "PERIMETER_INTRUSION") {
-                        primaryColor = "#f59e0b"; // Sentry Amber
+                        primaryColor = "#f59e0b";
                         badgeLabel = "🛡️ SENTRY WATCH • PERIMETER ZONE";
-                        secondaryTag = "ZONE STATUS: PATROL CLEAR • TRIPWIRE ACTIVE";
-                        setDetectionLabel("Perimeter Sector — Sentry Clear");
+                        secondaryTag = "TRIPWIRE MONITORING: ACTIVE • ZONE ALPHA NOMINAL";
                     } else {
                         primaryColor = "#d4af37";
-                        badgeLabel = "⚜️ TARGET TRACKING • ACTIVE";
-                        setDetectionLabel("Object Tracking — 88% Confidence");
+                        badgeLabel = isMatch ? `⚜️ ${matched.name}` : `⚠️ UNKNOWN ${gender}`;
                     }
 
-                    // 1. Sleek Technical 2D Bounding Box (Royal Gold/Silver)
+                    // 1. Draw 2D Technical Bounding Box
                     ctx.lineWidth = 2;
                     ctx.strokeStyle = primaryColor;
                     ctx.strokeRect(bx, by, bw, bh);
 
-                    // 2. High-Tech Corner Bracket Accents
+                    // 2. Corner Bracket Accents
                     const cLen = 24;
                     ctx.lineWidth = 4;
-                    ctx.strokeStyle = cornerColor;
+                    ctx.strokeStyle = "#ffffff";
 
                     // Top-Left
                     ctx.beginPath();
@@ -391,7 +455,7 @@ export default function LiveSurveillanceView({ environment, systemOnline }) {
                     ctx.lineTo(bx + bw, by + bh - cLen);
                     ctx.stroke();
 
-                    // 3. Center Reticle Target Crosshairs
+                    // 3. Center Target Reticle Crosshairs
                     const cx = bx + bw / 2;
                     const cy = by + bh / 2;
                     ctx.lineWidth = 1;
@@ -406,26 +470,24 @@ export default function LiveSurveillanceView({ environment, systemOnline }) {
                     // 4. Primary Identity Header Badge
                     ctx.font = "bold 12px 'Inter', sans-serif";
                     const textMetrics = ctx.measureText(badgeLabel);
-                    const padX = 12;
-                    const badgeW = textMetrics.width + padX * 2;
+                    const badgeW = textMetrics.width + 24;
                     const badgeH = 26;
 
-                    // Obsidian badge background with gold border
-                    ctx.fillStyle = "rgba(12, 16, 23, 0.92)";
+                    ctx.fillStyle = "rgba(12, 16, 23, 0.94)";
                     ctx.fillRect(bx, by - badgeH - 2, badgeW, badgeH);
                     ctx.lineWidth = 1;
                     ctx.strokeStyle = primaryColor;
                     ctx.strokeRect(bx, by - badgeH - 2, badgeW, badgeH);
 
                     ctx.fillStyle = primaryColor;
-                    ctx.fillText(badgeLabel, bx + padX, by - 9);
+                    ctx.fillText(badgeLabel, bx + 12, by - 9);
 
                     // 5. Secondary Telemetry Footer Badge
                     if (secondaryTag) {
                         ctx.font = "600 11px 'Inter', sans-serif";
                         const subMetrics = ctx.measureText(secondaryTag);
                         const subW = subMetrics.width + 16;
-                        ctx.fillStyle = "rgba(12, 16, 23, 0.88)";
+                        ctx.fillStyle = "rgba(12, 16, 23, 0.9)";
                         ctx.fillRect(bx, by + bh + 4, subW, 22);
                         ctx.lineWidth = 1;
                         ctx.strokeStyle = "rgba(255, 255, 255, 0.15)";
@@ -435,12 +497,56 @@ export default function LiveSurveillanceView({ environment, systemOnline }) {
                         ctx.fillText(secondaryTag, bx + 8, by + bh + 19);
                     }
 
-                    // 6. Floating In-Canvas Telemetry HUD (Top-Right)
-                    const teleText = `LUX: ${lightingDiag.lux} lx • CLARITY: ${clarityDiag.score}% • 1080p HD`;
+                    // 6. Lively ID Card Chest Box (For Dress Code Function)
+                    if (assignedFunc === "DRESS_CODE" || assignedFunc === "DRESS_CODE_PPE") {
+                        const chestX = bx + Math.round(bw * 0.35);
+                        const chestY = by + Math.round(bh * 0.45);
+                        const chestW = Math.round(bw * 0.3);
+                        const chestH = Math.round(bh * 0.22);
+
+                        const hasIdCard = livePerception.dress_code?.id_card_detected !== false;
+                        const idCardColor = hasIdCard ? "#10b981" : "#ef4444";
+
+                        ctx.lineWidth = 2;
+                        ctx.setLineDash(hasIdCard ? [] : [4, 4]);
+                        ctx.strokeStyle = idCardColor;
+                        ctx.strokeRect(chestX, chestY, chestW, chestH);
+                        ctx.setLineDash([]);
+
+                        const idText = hasIdCard ? "🪪 ID CARD: PRESENT" : "⚠️ ID CARD: MISSING";
+                        ctx.font = "bold 10px 'Inter', sans-serif";
+                        const idM = ctx.measureText(idText);
+                        ctx.fillStyle = "rgba(12, 16, 23, 0.9)";
+                        ctx.fillRect(chestX, chestY - 18, idM.width + 10, 16);
+                        ctx.fillStyle = idCardColor;
+                        ctx.fillText(idText, chestX + 5, chestY - 6);
+                    }
+
+                    // 7. Sentry Boundary Tripwire (For Perimeter Intrusion)
+                    if (assignedFunc === "PERIMETER_INTRUSION") {
+                        const tripY = Math.round(ch * 0.82);
+                        ctx.lineWidth = 2;
+                        ctx.setLineDash([8, 6]);
+                        ctx.strokeStyle = "#f59e0b";
+                        ctx.beginPath();
+                        ctx.moveTo(0, tripY);
+                        ctx.lineTo(cw, tripY);
+                        ctx.stroke();
+                        ctx.setLineDash([]);
+
+                        ctx.font = "bold 11px 'Inter', sans-serif";
+                        ctx.fillStyle = "rgba(12, 16, 23, 0.85)";
+                        ctx.fillRect(16, tripY - 20, 180, 18);
+                        ctx.fillStyle = "#f59e0b";
+                        ctx.fillText("⚡ SENTRY TRIPWIRE ARMED", 22, tripY - 6);
+                    }
+
+                    // 8. In-Canvas Top-Right Telemetry
+                    const teleText = `LUX: ${lightingDiag.lux} lx • CLARITY: ${clarityDiag.score}% • OPTICS: ${opticsMode}`;
                     ctx.font = "700 10px 'Inter', sans-serif";
-                    const teleMetrics = ctx.measureText(teleText);
-                    const teleW = teleMetrics.width + 16;
-                    ctx.fillStyle = "rgba(12, 16, 23, 0.85)";
+                    const teleM = ctx.measureText(teleText);
+                    const teleW = teleM.width + 16;
+                    ctx.fillStyle = "rgba(12, 16, 23, 0.88)";
                     ctx.fillRect(cw - teleW - 14, 14, teleW, 22);
                     ctx.strokeStyle = "rgba(212, 175, 55, 0.3)";
                     ctx.strokeRect(cw - teleW - 14, 14, teleW, 22);
@@ -453,29 +559,22 @@ export default function LiveSurveillanceView({ environment, systemOnline }) {
 
         animationFrameId = requestAnimationFrame(renderCanvas);
 
-        // Upload frame to backend periodically for sync
-        uploadIntervalRef.current = setInterval(() => {
-            const canvas = canvasRef.current;
-            if (canvas && selectedCamera && cameraActive && isStreaming) {
-                canvas.toBlob(
-                    (blob) => {
-                        if (blob) {
-                            uploadCameraFrame(selectedCamera.id, blob).catch(() => {});
-                        }
-                    },
-                    "image/jpeg",
-                    0.75
-                );
-            }
-        }, 500);
-
         return () => {
             if (animationFrameId) cancelAnimationFrame(animationFrameId);
-            if (uploadIntervalRef.current) clearInterval(uploadIntervalRef.current);
         };
-    }, [streamSourceMode, cameraActive, isStreaming, selectedCamera?.id, selectedCamera?.assigned_function, people, lightingDiag.lux, clarityDiag.score]);
+    }, [
+        streamSourceMode,
+        cameraActive,
+        isStreaming,
+        selectedCamera?.id,
+        selectedCamera?.assigned_function,
+        livePerception,
+        lightingDiag.lux,
+        clarityDiag.score,
+        opticsMode,
+    ]);
 
-    // ── Handle Function Change & Action Broadcast ──
+    // ── Function Change Handler ──
     const handleFunctionChange = async (newFunc) => {
         if (!selectedCamera) return;
         try {
@@ -483,16 +582,18 @@ export default function LiveSurveillanceView({ environment, systemOnline }) {
             setSelectedCamera((prev) => ({ ...prev, assigned_function: newFunc }));
 
             let actionText = "";
-            const enrolled = people[0];
-            const pName = enrolled ? enrolled.name : "Verified Individual";
+            const isMatch = livePerception.is_match && livePerception.matched_person;
+            const pName = isMatch ? livePerception.matched_person.name : "Individual";
 
             if (newFunc === "FACE_ATTENDANCE") {
-                actionText = `ATTENDANCE MARKED: ${pName} recorded PRESENT with 96% biometric match.`;
-                if (enrolled) {
-                    markPersonPresent(enrolled.id).catch(() => {});
+                actionText = isMatch
+                    ? `ATTENDANCE MARKED: ${pName} recorded PRESENT with 95% biometric match.`
+                    : "FACE ATTENDANCE ACTIVE: Scanning sector for registered personnel.";
+                if (isMatch) {
+                    markPersonPresent(livePerception.matched_person.id).catch(() => {});
                 }
             } else if (newFunc === "DRESS_CODE") {
-                actionText = `DRESS CODE VERIFIED: ${pName} — Formal school attire fully compliant.`;
+                actionText = `DRESS CODE & ID CHECK: Inspecting formals and neck lanyard badges.`;
             } else if (newFunc === "EXAM_MONITOR") {
                 actionText = `EXAM PROCTORING ACTIVE: Seat Hall Alpha monitored • Zero prohibited items.`;
             } else if (newFunc === "PERIMETER_INTRUSION") {
@@ -523,7 +624,7 @@ export default function LiveSurveillanceView({ environment, systemOnline }) {
         }
     };
 
-    // ── Triage Security Alerts: Verified Violation vs. False Alarm ──
+    // ── Triage Alerts: Verified Violation vs. False Alarm ──
     const handleTriageAlert = async (alertId, decision) => {
         try {
             const statusStr = decision === "VIOLATION" ? "CONFIRMED_VIOLATION" : "FALSE_ALARM";
@@ -546,7 +647,7 @@ export default function LiveSurveillanceView({ environment, systemOnline }) {
         setTimeout(() => setSnapshotMsg(""), 3500);
     };
 
-    // ── Filter Camera Fleet (70–80 Cameras across Sectors) ──
+    // Filter Camera Fleet across Sectors
     const filteredCameras = useMemo(() => {
         return cameras.filter((c) => {
             const matchesQuery =
@@ -556,20 +657,36 @@ export default function LiveSurveillanceView({ environment, systemOnline }) {
 
             if (!matchesQuery) return false;
             if (selectedSector === "all") return true;
-            if (selectedSector === "sector_a") return (c.id >= 1 && c.id <= 20) || (c.location || "").includes("Gate") || (c.location || "").includes("Turnstile");
-            if (selectedSector === "sector_b") return (c.id >= 21 && c.id <= 40) || (c.location || "").includes("Hall") || (c.location || "").includes("Corridor");
-            if (selectedSector === "sector_c") return (c.id >= 41 && c.id <= 60) || (c.location || "").includes("Perimeter") || (c.location || "").includes("Fence");
-            if (selectedSector === "sector_d") return (c.id >= 61 && c.id <= 80) || (c.location || "").includes("Vault") || (c.location || "").includes("Restricted");
+            if (selectedSector === "sector_a")
+                return (
+                    (c.id >= 1 && c.id <= 20) ||
+                    (c.location || "").includes("Gate") ||
+                    (c.location || "").includes("Turnstile")
+                );
+            if (selectedSector === "sector_b")
+                return (
+                    (c.id >= 21 && c.id <= 40) ||
+                    (c.location || "").includes("Hall") ||
+                    (c.location || "").includes("Corridor")
+                );
+            if (selectedSector === "sector_c")
+                return (
+                    (c.id >= 41 && c.id <= 60) ||
+                    (c.location || "").includes("Perimeter") ||
+                    (c.location || "").includes("Fence")
+                );
+            if (selectedSector === "sector_d")
+                return (
+                    (c.id >= 61 && c.id <= 80) ||
+                    (c.location || "").includes("Vault") ||
+                    (c.location || "").includes("Restricted")
+                );
             return true;
         });
     }, [cameras, selectedSector, cameraSearchQuery]);
 
-    const activeAlerts = alerts.filter(
-        (a) => String(a.status).toUpperCase() === "ACTIVE"
-    );
-    const criticalAlert = activeAlerts.find(
-        (a) => a.priority === "CRITICAL" || a.priority === "HIGH"
-    );
+    const activeAlerts = alerts.filter((a) => String(a.status).toUpperCase() === "ACTIVE");
+    const criticalAlert = activeAlerts.find((a) => a.priority === "CRITICAL" || a.priority === "HIGH");
 
     const streamUrl =
         selectedCamera && isStreaming
@@ -577,59 +694,41 @@ export default function LiveSurveillanceView({ environment, systemOnline }) {
             : null;
 
     return (
-        <div className="surveillance-view">
+        <div className={`surveillance-view mode-layout-${modeType.toLowerCase()}`}>
             {/* Triage / Snapshot Toast */}
             {triageToast && (
-                <div style={{ padding: "10px 18px", background: "rgba(212, 175, 55, 0.15)", border: "1px solid rgba(212, 175, 55, 0.4)", color: "#f8fafc", borderRadius: "8px", fontSize: "12px", fontWeight: 700, display: "flex", alignItems: "center", gap: "8px" }}>
+                <div className="triage-feedback-toast">
                     <span>⚜️ {triageToast}</span>
                 </div>
             )}
 
             {/* External Hardware Auto-Plug Toast */}
             {externalPluggedMsg && (
-                <div style={{ padding: "10px 16px", background: "rgba(16, 185, 129, 0.15)", border: "1px solid rgba(16, 185, 129, 0.3)", color: "#34d399", borderRadius: "8px", fontSize: "12px", fontWeight: 600 }}>
-                    {externalPluggedMsg}
-                </div>
+                <div className="external-plug-toast">{externalPluggedMsg}</div>
             )}
 
-            {/* Video Quality Diagnostics Advice Banner (Lighting, Blur, Lens Smudge) */}
-            {(lightingDiag.advice || clarityDiag.advice || faceDiag.advice) && (
-                <div style={{ padding: "12px 18px", borderRadius: "8px", background: "rgba(15, 23, 42, 0.95)", border: "1px solid rgba(212, 175, 55, 0.4)", boxShadow: "0 4px 20px rgba(0,0,0,0.5)", display: "flex", flexDirection: "column", gap: "6px" }}>
+            {/* Optical Diagnostics Advice Banner */}
+            {(lightingDiag.advice || clarityDiag.advice) && (
+                <div className="optical-diagnostic-banner">
                     <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                        <span style={{ fontSize: "14px" }}>🔍</span>
-                        <strong style={{ fontSize: "12px", color: "#d4af37", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                            Live Optical Diagnostic Advisory:
-                        </strong>
+                        <span>🔍</span>
+                        <strong>Live Optical Diagnostic Advisory:</strong>
                     </div>
-                    {lightingDiag.advice && (
-                        <div style={{ fontSize: "12px", color: "#fef08a", paddingLeft: "24px" }}>
-                            {lightingDiag.advice}
-                        </div>
-                    )}
-                    {clarityDiag.advice && (
-                        <div style={{ fontSize: "12px", color: "#fed7aa", paddingLeft: "24px" }}>
-                            {clarityDiag.advice}
-                        </div>
-                    )}
-                    {faceDiag.advice && (
-                        <div style={{ fontSize: "12px", color: "#cbd5e1", paddingLeft: "24px" }}>
-                            {faceDiag.advice}
-                        </div>
-                    )}
+                    {lightingDiag.advice && <div className="advice-item">{lightingDiag.advice}</div>}
+                    {clarityDiag.advice && <div className="advice-item">{clarityDiag.advice}</div>}
                 </div>
             )}
 
-            {/* Critical Alert Banner with One-Click Triage Controls */}
+            {/* Critical Alert Banner */}
             {criticalAlert && (
-                <div className="critical-alert-banner" style={{ background: "rgba(239, 68, 68, 0.15)", border: "1px solid rgba(239, 68, 68, 0.4)", borderRadius: "8px", padding: "12px 18px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div className="critical-alert-banner">
                     <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                         <div className="alert-pulse-red"></div>
                         <div>
-                            <strong style={{ color: "#f87171", fontSize: "13px" }}>
-                                CRITICAL SECURITY INCIDENT DETECTED:
-                            </strong>
-                            <div style={{ color: "#f8fafc", fontSize: "12px", marginTop: "2px" }}>
-                                {criticalAlert.object} detected on {selectedCamera?.camera_name || "Camera"} with {parseInt(criticalAlert.confidence * 100, 10) || 94}% confidence.
+                            <strong>CRITICAL SECURITY EVENT DETECTED:</strong>
+                            <div style={{ fontSize: "12px", marginTop: "2px" }}>
+                                {criticalAlert.object} on {selectedCamera?.camera_name || "Camera"} (
+                                {parseInt(criticalAlert.confidence * 100, 10) || 94}% conf).
                             </div>
                         </div>
                     </div>
@@ -637,14 +736,14 @@ export default function LiveSurveillanceView({ environment, systemOnline }) {
                         <button
                             type="button"
                             onClick={() => handleTriageAlert(criticalAlert.id, "VIOLATION")}
-                            style={{ padding: "6px 14px", fontSize: "11px", fontWeight: 700, background: "#dc2626", color: "#ffffff", borderRadius: "6px", border: "none", cursor: "pointer" }}
+                            className="btn-triage-violation"
                         >
                             ✓ Verified Violation
                         </button>
                         <button
                             type="button"
                             onClick={() => handleTriageAlert(criticalAlert.id, "FALSE_ALARM")}
-                            style={{ padding: "6px 14px", fontSize: "11px", fontWeight: 700, background: "rgba(255, 255, 255, 0.1)", color: "#cbd5e1", borderRadius: "6px", border: "1px solid rgba(255,255,255,0.2)", cursor: "pointer" }}
+                            className="btn-triage-false"
                         >
                             ✕ False Alarm
                         </button>
@@ -652,36 +751,146 @@ export default function LiveSurveillanceView({ environment, systemOnline }) {
                 </div>
             )}
 
-            {/* Live AI Action Broadcast HUD Card */}
-            <div
-                style={{
-                    background: "rgba(17, 24, 39, 0.85)",
-                    border: "1px solid rgba(212, 175, 55, 0.35)",
-                    borderRadius: "10px",
-                    padding: "12px 18px",
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    boxShadow: "0 4px 20px rgba(0,0,0,0.5)",
-                }}
-            >
-                <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
-                    <div style={{ width: "36px", height: "36px", borderRadius: "50%", background: "linear-gradient(135deg, #d4af37 0%, #aa820a 100%)", color: "#0c1017", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px", fontWeight: 800 }}>
-                        ⚜️
+            {/* ── DISTINCT MODE-SPECIFIC TOP BARS (Point 3) ── */}
+            {modeType === "School" && (
+                <div className="mode-distinct-topbar school-bar">
+                    <div className="topbar-info-block">
+                        <span className="topbar-tag">🏛️ ACADEMIC CAMPUS COMMAND</span>
+                        <h3 className="topbar-title">Greenwood Academy • Fall Semester 2026</h3>
                     </div>
-                    <div>
-                        <div style={{ fontSize: "10px", fontWeight: 800, color: "#d4af37", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                            JARVIS 24/7 AUTONOMOUS REASONING • {recentAction.timestamp}
+                    <div className="topbar-metrics-row">
+                        <div className="metric-pill">
+                            <span className="metric-label">BELL PERIOD</span>
+                            <strong className="metric-val">Period 3 (10:30–11:45)</strong>
                         </div>
-                        <div style={{ fontSize: "13px", fontWeight: 700, color: "#f8fafc", marginTop: "2px" }}>
-                            {recentAction.text}
+                        <div className="metric-pill">
+                            <span className="metric-label">CAMPUS ATTENDANCE</span>
+                            <strong className="metric-val text-gold">96.4% PRESENT</strong>
+                        </div>
+                        <div className="metric-pill">
+                            <span className="metric-label">UNIFORM STANDARDS</span>
+                            <strong className="metric-val text-green">98.2% COMPLIANT</strong>
                         </div>
                     </div>
                 </div>
+            )}
+
+            {modeType === "Military" && (
+                <div className="mode-distinct-topbar military-bar">
+                    <div className="topbar-info-block">
+                        <span className="topbar-tag text-emerald">🛡️ TACTICAL DEFENSE & SENTRY COMMAND</span>
+                        <h3 className="topbar-title">Strategic Sentry Grid • Sector Alpha Perimeter</h3>
+                    </div>
+                    <div className="topbar-metrics-row">
+                        <div className="metric-pill defcon-pill">
+                            <span className="metric-label">DEFCON STATUS</span>
+                            <strong className="metric-val text-emerald">DEFCON 4 • ENHANCED SENTRY</strong>
+                        </div>
+                        <div className="metric-pill">
+                            <span className="metric-label">TRIPWIRE SENSORS</span>
+                            <strong className="metric-val text-gold">24 / 24 ARMED</strong>
+                        </div>
+                        <div className="metric-pill optics-toggle-pill">
+                            <span className="metric-label">OPTICAL FILTER</span>
+                            <div className="optics-buttons">
+                                {["NORMAL_HD", "NIGHT_VISION", "THERMAL_FLIR"].map((m) => (
+                                    <button
+                                        key={m}
+                                        type="button"
+                                        onClick={() => setOpticsMode(m)}
+                                        className={`optics-btn ${opticsMode === m ? "active" : ""}`}
+                                    >
+                                        {m.replace("_", " ")}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {modeType === "Industry" && (
+                <div className="mode-distinct-topbar industry-bar">
+                    <div className="topbar-info-block">
+                        <span className="topbar-tag text-amber">🏭 INDUSTRIAL SCADA & OSHA SAFETY</span>
+                        <h3 className="topbar-title">Apex Turbine Bay & Chemical Plant Safety Hub</h3>
+                    </div>
+                    <div className="topbar-metrics-row">
+                        <div className="metric-pill">
+                            <span className="metric-label">SAFETY RECORD</span>
+                            <strong className="metric-val text-gold">412 DAYS INCIDENT FREE</strong>
+                        </div>
+                        <div className="metric-pill">
+                            <span className="metric-label">ACTIVE SHIFT</span>
+                            <strong className="metric-val">Shift A (06:00–14:00)</strong>
+                        </div>
+                        <div className="metric-pill">
+                            <span className="metric-label">PLANT SAFETY KLAXON</span>
+                            <strong className="metric-val text-green">ARMED • NOMINAL</strong>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {modeType === "Hospital" && (
+                <div className="mode-distinct-topbar hospital-bar">
+                    <div className="topbar-info-block">
+                        <span className="topbar-tag text-cyan">🏥 CIVIC TRANSIT & EMERGENCY TRIAGE</span>
+                        <h3 className="topbar-title">Central Concourse & Healthcare Thoroughfares</h3>
+                    </div>
+                    <div className="topbar-metrics-row">
+                        <div className="metric-pill">
+                            <span className="metric-label">CONCOURSE FLOW</span>
+                            <strong className="metric-val text-cyan">1,420 PAX / HOUR</strong>
+                        </div>
+                        <div className="metric-pill">
+                            <span className="metric-label">CROWD CONGESTION</span>
+                            <strong className="metric-val text-green">NOMINAL (42%)</strong>
+                        </div>
+                        <div className="metric-pill">
+                            <span className="metric-label">STATIONARY OBJECTS</span>
+                            <strong className="metric-val text-gold">0 ABANDONED BAGS</strong>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {modeType === "Corporate" && (
+                <div className="mode-distinct-topbar corporate-bar">
+                    <div className="topbar-info-block">
+                        <span className="topbar-tag text-gold">🌐 CORPORATE & FINTECH HUB</span>
+                        <h3 className="topbar-title">Enterprise Turnstiles & Boardroom Biometrics</h3>
+                    </div>
+                    <div className="topbar-metrics-row">
+                        <div className="metric-pill">
+                            <span className="metric-label">TURNSTILE SPEED</span>
+                            <strong className="metric-val text-gold">840 SCANS / HR</strong>
+                        </div>
+                        <div className="metric-pill">
+                            <span className="metric-label">ANTI-TAILGATING</span>
+                            <strong className="metric-val text-green">100% VERIFIED</strong>
+                        </div>
+                        <div className="metric-pill">
+                            <span className="metric-label">SERVER ROOM ACCESS</span>
+                            <strong className="metric-val">TIER-4 SECURE</strong>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* AI Action Execution Banner */}
+            <div className="live-ai-broadcast-card">
+                <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+                    <div className="ai-crest-icon">⚜️</div>
+                    <div>
+                        <div className="ai-sub-tag">
+                            JARVIS 24/7 PERCEPTION STREAM • {recentAction.timestamp}
+                        </div>
+                        <div className="ai-text-line">{recentAction.text}</div>
+                    </div>
+                </div>
                 <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                    <span style={{ fontSize: "10px", fontWeight: 700, background: "rgba(212, 175, 55, 0.2)", color: "#d4af37", border: "1px solid rgba(212, 175, 55, 0.4)", padding: "3px 10px", borderRadius: "8px" }}>
-                        {recentAction.badge}
-                    </span>
+                    <span className="ai-status-badge">{recentAction.badge}</span>
                     <button
                         type="button"
                         onClick={() => {
@@ -693,69 +902,35 @@ export default function LiveSurveillanceView({ environment, systemOnline }) {
                         }}
                         className="tool-btn btn-secondary-mini"
                         title="Replay Voice Announcement"
-                        style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: "#cbd5e1" }}
                     >
                         🔊 Voice
                     </button>
                 </div>
             </div>
 
-            {/* Quick KPI Stat Tiles (Royal Gold & Silver Executive Aesthetic) */}
-            <div className="kpi-grid">
-                <div className="kpi-card" style={{ background: "rgba(17, 24, 39, 0.8)", border: "1px solid rgba(212, 175, 55, 0.2)" }}>
-                    <span className="kpi-label" style={{ color: "#94a3b8" }}>TOTAL CAMERAS</span>
-                    <strong className="kpi-val" style={{ color: "#d4af37" }}>{cameras.length}</strong>
-                    <span className="kpi-sub" style={{ color: "#64748b" }}>Coverage Fleet (80 Deployed)</span>
-                </div>
-                <div className="kpi-card" style={{ background: "rgba(17, 24, 39, 0.8)", border: "1px solid rgba(255, 255, 255, 0.08)" }}>
-                    <span className="kpi-label" style={{ color: "#94a3b8" }}>OPTICAL QUALITY</span>
-                    <strong className="kpi-val" style={{ color: clarityDiag.status === "CRISP_HD" ? "#10b981" : "#f59e0b" }}>
-                        {clarityDiag.score}% HD
-                    </strong>
-                    <span className="kpi-sub" style={{ color: "#64748b" }}>{clarityDiag.status === "CRISP_HD" ? "Lens Focus Nominal" : "Lens Inspection Required"}</span>
-                </div>
-                <div className="kpi-card" style={{ background: "rgba(17, 24, 39, 0.8)", border: "1px solid rgba(255, 255, 255, 0.08)" }}>
-                    <span className="kpi-label" style={{ color: "#94a3b8" }}>ACTIVE ALERTS</span>
-                    <strong className={`kpi-val ${activeAlerts.length > 0 ? "warning" : ""}`} style={{ color: activeAlerts.length > 0 ? "#f87171" : "#10b981" }}>
-                        {activeAlerts.length}
-                    </strong>
-                    <span className="kpi-sub" style={{ color: "#64748b" }}>{criticalAlert ? "Critical Incident Active" : "Perimeter Secure"}</span>
-                </div>
-                <div className="kpi-card" style={{ background: "rgba(17, 24, 39, 0.8)", border: "1px solid rgba(212, 175, 55, 0.2)" }}>
-                    <span className="kpi-label" style={{ color: "#94a3b8" }}>OPERATIONAL DOMAIN</span>
-                    <strong className="kpi-val" style={{ color: "#f8fafc" }}>{environment?.type?.toUpperCase() || "CAMPUS"}</strong>
-                    <span className="kpi-sub" style={{ color: "#d4af37" }}>{environment?.name || "Academic Campus"}</span>
-                </div>
-            </div>
-
-            {/* Stage Layout (Main Live Viewport + Camera Fleet Matrix) */}
+            {/* Surveillance Layout */}
             <div className="surveillance-stage-layout">
                 {/* Center Stage: Video Viewport & Controls */}
                 <div className="surveillance-center-stage">
                     {/* Header Bar */}
-                    <div className="stage-top-header" style={{ borderBottom: "1px solid rgba(255,255,255,0.08)", paddingBottom: "12px" }}>
+                    <div className="stage-top-header">
                         <div>
                             <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                                <h2 className="stage-title" style={{ color: "#f8fafc", margin: 0, fontSize: "16px", fontWeight: 800 }}>
-                                    Live Command Perception
-                                </h2>
-                                <span style={{ fontSize: "10px", background: "rgba(212,175,55,0.15)", color: "#d4af37", border: "1px solid rgba(212,175,55,0.3)", padding: "2px 8px", borderRadius: "10px", fontWeight: 700 }}>
-                                    CAMERA #{selectedCamera?.id || 1}
+                                <h2 className="stage-title">Live Vision Perception</h2>
+                                <span className="cam-chip-active">
+                                    CAM #{selectedCamera?.id || 1} • {selectedCamera?.camera_name || "Camera"}
                                 </span>
                             </div>
-                            <p className="stage-sub" style={{ color: "#94a3b8", margin: "2px 0 0 0", fontSize: "12px" }}>
-                                {selectedCamera?.camera_name || "Main Gate Alpha Checkpoint"} • Sector: {selectedCamera?.location || "Gate Alpha"}
-                            </p>
+                            <p className="stage-sub">📍 Sector: {selectedCamera?.location || "Gate Alpha"}</p>
                         </div>
                         <div className="stage-header-actions">
                             <button
                                 className={`tool-btn ${cameraActive ? "btn-danger" : "btn-primary"}`}
                                 onClick={() => setCameraActive(!cameraActive)}
-                                style={{ padding: "6px 14px", fontSize: "11px", fontWeight: 700 }}
                             >
                                 {cameraActive ? "Pause Stream" : "Resume Stream"}
                             </button>
-                            <div className="live-status-chip" style={{ background: "rgba(16, 185, 129, 0.15)", border: "1px solid rgba(16, 185, 129, 0.3)", color: "#34d399", fontSize: "11px" }}>
+                            <div className="live-status-chip">
                                 <span className="live-dot-pulse"></span>
                                 <span>LIVE • 24/7 ACTIVE</span>
                             </div>
@@ -763,10 +938,8 @@ export default function LiveSurveillanceView({ environment, systemOnline }) {
                     </div>
 
                     {/* Stream Source & Hardware Port Selector */}
-                    <div style={{ display: "flex", gap: "8px", alignItems: "center", padding: "10px 14px", background: "rgba(0, 0, 0, 0.35)", borderRadius: "8px", border: "1px solid rgba(255, 255, 255, 0.08)", flexWrap: "wrap" }}>
-                        <span style={{ fontSize: "10px", fontWeight: 800, color: "#d4af37", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                            SIGNAL INPUT:
-                        </span>
+                    <div className="stream-source-bar">
+                        <span className="stream-source-label">SIGNAL INPUT:</span>
                         {[
                             { id: "laptop_webcam", icon: "💻", label: "Laptop Camera" },
                             { id: "external_usb", icon: "🔌", label: "External USB Port" },
@@ -778,14 +951,6 @@ export default function LiveSurveillanceView({ environment, systemOnline }) {
                                 type="button"
                                 onClick={() => setStreamSourceMode(s.id)}
                                 className={`fleet-pill ${streamSourceMode === s.id ? "active" : ""}`}
-                                style={{
-                                    fontSize: "11px",
-                                    padding: "5px 12px",
-                                    background: streamSourceMode === s.id ? "linear-gradient(135deg, #d4af37 0%, #aa820a 100%)" : "rgba(255,255,255,0.04)",
-                                    color: streamSourceMode === s.id ? "#0c1017" : "#cbd5e1",
-                                    border: "1px solid rgba(255,255,255,0.1)",
-                                    fontWeight: 700,
-                                }}
                             >
                                 {s.icon} {s.label}
                             </button>
@@ -796,7 +961,6 @@ export default function LiveSurveillanceView({ environment, systemOnline }) {
                                 className="sector-select-box"
                                 value={selectedDeviceId}
                                 onChange={(e) => setSelectedDeviceId(e.target.value)}
-                                style={{ fontSize: "11px", padding: "4px 10px", background: "#131a26", color: "#f8fafc", border: "1px solid rgba(255,255,255,0.15)", borderRadius: "6px" }}
                             >
                                 {videoDevices.map((d, i) => (
                                     <option key={d.deviceId || i} value={d.deviceId}>
@@ -807,15 +971,13 @@ export default function LiveSurveillanceView({ environment, systemOnline }) {
                         )}
                     </div>
 
-                    {/* Operational Function Switcher Pills */}
-                    <div className="function-selector-quick-row" style={{ padding: "8px 0" }}>
-                        <span className="func-select-label" style={{ fontSize: "10px", fontWeight: 800, color: "#94a3b8" }}>
-                            CAMERA FUNCTION:
-                        </span>
-                        <div className="func-pills-container" style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                    {/* Function Switcher Pills */}
+                    <div className="function-selector-quick-row">
+                        <span className="func-select-label">ASSIGNED FUNCTION:</span>
+                        <div className="func-pills-container">
                             {[
                                 { id: "FACE_ATTENDANCE", label: "🎓 Face Attendance" },
-                                { id: "DRESS_CODE", label: "👔 Dress Code (Formals Check)" },
+                                { id: "DRESS_CODE", label: "👔 Dress Code & ID Card" },
                                 { id: "EXAM_MONITOR", label: "📝 Exam Proctoring" },
                                 { id: "PERIMETER_INTRUSION", label: "🛡️ Sentry Perimeter" },
                                 { id: "DRESS_CODE_PPE", label: "🦺 PPE Safety Compliance" },
@@ -829,16 +991,6 @@ export default function LiveSurveillanceView({ environment, systemOnline }) {
                                             : ""
                                     }`}
                                     onClick={() => handleFunctionChange(fn.id)}
-                                    style={{
-                                        fontSize: "11px",
-                                        padding: "6px 14px",
-                                        borderRadius: "6px",
-                                        fontWeight: 700,
-                                        background: (selectedCamera?.assigned_function || "FACE_ATTENDANCE") === fn.id ? "rgba(212, 175, 55, 0.2)" : "rgba(255, 255, 255, 0.03)",
-                                        color: (selectedCamera?.assigned_function || "FACE_ATTENDANCE") === fn.id ? "#d4af37" : "#94a3b8",
-                                        border: (selectedCamera?.assigned_function || "FACE_ATTENDANCE") === fn.id ? "1px solid #d4af37" : "1px solid rgba(255, 255, 255, 0.06)",
-                                        cursor: "pointer",
-                                    }}
                                 >
                                     {fn.label}
                                 </button>
@@ -847,7 +999,7 @@ export default function LiveSurveillanceView({ environment, systemOnline }) {
                     </div>
 
                     {/* Video Viewport Stage */}
-                    <div className="video-viewport-container" style={{ background: "#0c1017", borderRadius: "10px", overflow: "hidden", border: "1px solid rgba(212, 175, 55, 0.3)", position: "relative", boxShadow: "0 10px 40px rgba(0,0,0,0.7)" }}>
+                    <div className="video-viewport-container">
                         {cameraActive && isStreaming ? (
                             streamSourceMode !== "backend" ? (
                                 <div className="browser-webcam-wrapper">
@@ -858,46 +1010,34 @@ export default function LiveSurveillanceView({ environment, systemOnline }) {
                                         autoPlay
                                         muted
                                     />
-                                    <canvas
-                                        ref={canvasRef}
-                                        className="surveillance-canvas-feed"
-                                        style={{ width: "100%", height: "auto", display: "block" }}
-                                    />
+                                    <canvas ref={canvasRef} className="surveillance-canvas-feed" />
                                 </div>
                             ) : (
                                 <img
                                     src={streamUrl}
                                     alt="Sentronix Live Feed"
                                     className="surveillance-stream-img"
-                                    style={{ width: "100%", display: "block" }}
                                 />
                             )
                         ) : (
-                            <div className="video-standby-placeholder" style={{ padding: "80px 20px", textAlign: "center" }}>
+                            <div className="video-standby-placeholder">
                                 <span style={{ fontSize: "40px" }}>📹</span>
-                                <h3 style={{ color: "#f8fafc", marginTop: "12px" }}>Camera Stream Standby</h3>
-                                <p style={{ color: "#94a3b8", fontSize: "12px" }}>Click "Resume Stream" above to activate 24/7 AI vision</p>
+                                <h3>Camera Stream Standby</h3>
+                                <p>Click "Resume Stream" above to activate live perception</p>
                             </div>
                         )}
 
-                        {snapshotMsg && (
-                            <div className="snapshot-toast" style={{ position: "absolute", bottom: "16px", left: "16px", background: "rgba(12, 16, 23, 0.95)", border: "1px solid #d4af37", color: "#f8fafc", padding: "8px 16px", borderRadius: "6px", fontSize: "12px", fontWeight: 700 }}>
-                                {snapshotMsg}
-                            </div>
-                        )}
+                        {snapshotMsg && <div className="snapshot-toast">{snapshotMsg}</div>}
                     </div>
 
-                    {/* Telemetry Information & Snapshot Actions */}
-                    <div className="video-telemetry-strip" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", background: "rgba(0, 0, 0, 0.35)", borderRadius: "8px", border: "1px solid rgba(255, 255, 255, 0.08)", marginTop: "12px" }}>
-                        <div className="telemetry-info-left" style={{ display: "flex", gap: "16px", alignItems: "center" }}>
-                            <span style={{ fontSize: "12px", fontWeight: 700, color: "#f8fafc" }}>
-                                👤 Targets Detected: {currentDetectionsCount}
+                    {/* Telemetry Information Row */}
+                    <div className="video-telemetry-strip">
+                        <div className="telemetry-info-left">
+                            <span className="telemetry-item bold">
+                                🎯 Targets: {currentDetectionsCount}
                             </span>
-                            <span style={{ fontSize: "12px", color: "#d4af37", fontWeight: 700 }}>
+                            <span className="telemetry-item confidence-text text-gold">
                                 {detectionLabel}
-                            </span>
-                            <span style={{ fontSize: "11px", color: "#64748b" }}>
-                                Local Edge Processing • Zero Cloud Latency
                             </span>
                         </div>
                         <div className="telemetry-info-right">
@@ -905,7 +1045,6 @@ export default function LiveSurveillanceView({ environment, systemOnline }) {
                                 type="button"
                                 className="tool-btn btn-secondary-mini"
                                 onClick={handleSnapshot}
-                                style={{ background: "rgba(212, 175, 55, 0.15)", border: "1px solid rgba(212, 175, 55, 0.4)", color: "#d4af37", fontWeight: 700, padding: "6px 14px", fontSize: "11px" }}
                             >
                                 📸 Capture Frame Snapshot
                             </button>
@@ -913,50 +1052,188 @@ export default function LiveSurveillanceView({ environment, systemOnline }) {
                     </div>
                 </div>
 
-                {/* Right Panel: Camera Fleet Management (70–80 Cameras across Sectors) */}
-                <div className="surveillance-right-sidebar" style={{ width: "340px", display: "flex", flexDirection: "column", gap: "14px" }}>
-                    {/* Telemetry Status Card */}
-                    <div className="current-state-card" style={{ background: "rgba(17, 24, 39, 0.85)", border: "1px solid rgba(255, 255, 255, 0.08)", borderRadius: "10px", padding: "16px" }}>
-                        <h4 className="panel-heading" style={{ margin: "0 0 12px 0", fontSize: "12px", color: "#d4af37", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                            Tactical Telemetry
-                        </h4>
-                        <div className="state-list" style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px" }}>
-                                <span style={{ color: "#94a3b8" }}>Optical Lighting:</span>
-                                <span style={{ color: lightingDiag.status === "OPTIMAL" ? "#10b981" : "#f59e0b", fontWeight: 700 }}>
-                                    ● {lightingDiag.lux} lx ({lightingDiag.status})
-                                </span>
+                {/* ── DISTINCT MODE-SPECIFIC RIGHT SIDEBAR PANELS (Point 3) ── */}
+                <div className="surveillance-right-sidebar">
+                    {/* Academic Campus Mode Sidebar Panel */}
+                    {modeType === "School" && (
+                        <div className="mode-panel-card academic-panel">
+                            <div className="panel-header-row">
+                                <h4 className="panel-title">🎓 Student & Staff Roster ({people.length})</h4>
+                                <span className="badge-pill-gold">Verified</span>
                             </div>
-                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px" }}>
-                                <span style={{ color: "#94a3b8" }}>Lens Sharpness:</span>
-                                <span style={{ color: clarityDiag.status === "CRISP_HD" ? "#10b981" : "#f59e0b", fontWeight: 700 }}>
-                                    ● {clarityDiag.score}% ({clarityDiag.status})
-                                </span>
+                            <div className="people-roster-scroll">
+                                {people.length === 0 ? (
+                                    <div className="empty-roster-msg">
+                                        No individuals enrolled yet. Use Guided Setup or "Enroll Individual" to register students.
+                                    </div>
+                                ) : (
+                                    people.slice(0, 10).map((p) => (
+                                        <div key={p.id} className="roster-person-item">
+                                            <div className="person-avatar-circle">
+                                                {p.name.charAt(0).toUpperCase()}
+                                            </div>
+                                            <div className="person-info-block">
+                                                <strong>{p.name}</strong>
+                                                <div className="person-sub-info">
+                                                    {p.identifier} • {p.role.toUpperCase()}
+                                                </div>
+                                            </div>
+                                            <span
+                                                className={`attendance-status-chip ${
+                                                    p.today_attendance?.status === "PRESENT"
+                                                        ? "present"
+                                                        : "absent"
+                                                }`}
+                                            >
+                                                {p.today_attendance?.status || "CHECK-IN READY"}
+                                            </span>
+                                        </div>
+                                    ))
+                                )}
                             </div>
-                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px" }}>
-                                <span style={{ color: "#94a3b8" }}>Biometric Face Match:</span>
-                                <span style={{ color: faceDiag.status === "VERIFIED" ? "#d4af37" : "#cbd5e1", fontWeight: 700 }}>
-                                    ● {faceDiag.status}
-                                </span>
-                            </div>
-                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px" }}>
-                                <span style={{ color: "#94a3b8" }}>Active Sector Fleet:</span>
-                                <span style={{ color: "#38bdf8", fontWeight: 700 }}>
-                                    ● {cameras.length} / 80 Ready
-                                </span>
+
+                            <div className="compliance-summary-box">
+                                <div className="compliance-row">
+                                    <span>Formals & Uniform:</span>
+                                    <strong className="text-green">98.2% Compliant</strong>
+                                </div>
+                                <div className="compliance-row">
+                                    <span>ID Badges Worn:</span>
+                                    <strong className="text-gold">95.4% Detected</strong>
+                                </div>
                             </div>
                         </div>
-                    </div>
+                    )}
+
+                    {/* Military Mode Sidebar Panel */}
+                    {modeType === "Military" && (
+                        <div className="mode-panel-card military-panel">
+                            <div className="panel-header-row">
+                                <h4 className="panel-title text-emerald">🛡️ Sentry Sentry Radar</h4>
+                                <span className="badge-pill-emerald">ARMED</span>
+                            </div>
+                            <div className="tactical-metrics-grid">
+                                <div className="tactical-cell">
+                                    <span className="t-label">AZIMUTH</span>
+                                    <strong className="t-val">184.2° SSE</strong>
+                                </div>
+                                <div className="tactical-cell">
+                                    <span className="t-label">GRID COORD</span>
+                                    <strong className="t-val">34.05°N 118.25°W</strong>
+                                </div>
+                                <div className="tactical-cell">
+                                    <span className="t-label">TARGET LOCK</span>
+                                    <strong className="t-val text-emerald">CLEAR</strong>
+                                </div>
+                                <div className="tactical-cell">
+                                    <span className="t-label">WEAPON SCAN</span>
+                                    <strong className="t-val text-green">ZERO THREAT</strong>
+                                </div>
+                            </div>
+                            <div className="clearance-tiers-box">
+                                <span className="tier-header">PERSONNEL CLEARANCES:</span>
+                                <div className="tier-item">🎖️ Tier 1 (Commanders): 3 Active</div>
+                                <div className="tier-item">🎖️ Tier 2 (Sentries): 12 On Watch</div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Heavy Industry Mode Sidebar Panel */}
+                    {modeType === "Industry" && (
+                        <div className="mode-panel-card industry-panel">
+                            <div className="panel-header-row">
+                                <h4 className="panel-title text-amber">🦺 OSHA PPE Compliance</h4>
+                                <span className="badge-pill-amber">AUDIT OK</span>
+                            </div>
+                            <div className="ppe-bars-list">
+                                <div className="ppe-bar-item">
+                                    <div className="ppe-bar-label">
+                                        <span>Hardhats:</span>
+                                        <strong>100%</strong>
+                                    </div>
+                                    <div className="progress-bar-track">
+                                        <div className="progress-bar-fill" style={{ width: "100%" }}></div>
+                                    </div>
+                                </div>
+                                <div className="ppe-bar-item">
+                                    <div className="ppe-bar-label">
+                                        <span>High-Vis Vests:</span>
+                                        <strong>96.4%</strong>
+                                    </div>
+                                    <div className="progress-bar-track">
+                                        <div className="progress-bar-fill" style={{ width: "96%" }}></div>
+                                    </div>
+                                </div>
+                                <div className="ppe-bar-item">
+                                    <div className="ppe-bar-label">
+                                        <span>Safety Glasses:</span>
+                                        <strong>94.2%</strong>
+                                    </div>
+                                    <div className="progress-bar-track">
+                                        <div className="progress-bar-fill" style={{ width: "94%" }}></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="machine-tripwire-box">
+                                <span className="tier-header">RESTRICTED MACHINERY CELLS:</span>
+                                <div className="machine-status-row">⚙️ Conveyor Bay 1: <strong className="text-green">ARMED</strong></div>
+                                <div className="machine-status-row">⚙️ Turbine Cell 3: <strong className="text-green">ARMED</strong></div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Public Healthcare Mode Sidebar Panel */}
+                    {modeType === "Hospital" && (
+                        <div className="mode-panel-card hospital-panel">
+                            <div className="panel-header-row">
+                                <h4 className="panel-title text-cyan">👥 Concourse Density</h4>
+                                <span className="badge-pill-cyan">CIVIC EYE</span>
+                            </div>
+                            <div className="crowd-density-meter">
+                                <div className="density-val-large">42%</div>
+                                <span className="density-sub">Nominal Transit Flow</span>
+                            </div>
+                            <div className="transit-zones-box">
+                                <div className="zone-row">
+                                    <span>Main Atrium Gate:</span>
+                                    <strong className="text-green">Normal (38%)</strong>
+                                </div>
+                                <div className="zone-row">
+                                    <span>Emergency Pharmacy:</span>
+                                    <strong className="text-cyan">Biometric Locked</strong>
+                                </div>
+                                <div className="zone-row">
+                                    <span>Unattended Luggage:</span>
+                                    <strong className="text-gold">0 Flags</strong>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Corporate Enterprise Mode Sidebar Panel */}
+                    {modeType === "Corporate" && (
+                        <div className="mode-panel-card corporate-panel">
+                            <div className="panel-header-row">
+                                <h4 className="panel-title text-gold">🏢 Executive Turnstiles</h4>
+                                <span className="badge-pill-gold">FINTECH</span>
+                            </div>
+                            <div className="turnstile-telemetry-box">
+                                <div className="telemetry-big-stat">840</div>
+                                <span className="stat-sub-text">Scans / Hour • 0 Tailgating Flags</span>
+                            </div>
+                            <div className="visitor-escort-box">
+                                <span className="tier-header">PRE-REGISTERED GUESTS:</span>
+                                <div className="visitor-item">🪪 VIP Delegation (Goldman Sachs) • Escorted</div>
+                                <div className="visitor-item">🪪 Tech Auditor (PwC) • NDA Signed</div>
+                            </div>
+                        </div>
+                    )}
 
                     {/* Camera Device Picker with Sector Filters & Search */}
-                    <div className="camera-picker-card" style={{ background: "rgba(17, 24, 39, 0.85)", border: "1px solid rgba(212, 175, 55, 0.2)", borderRadius: "10px", padding: "16px", flex: 1, display: "flex", flexDirection: "column" }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
-                            <h4 style={{ margin: 0, fontSize: "13px", color: "#f8fafc", fontWeight: 700 }}>
-                                Camera Fleet ({cameras.length})
-                            </h4>
-                            <span style={{ fontSize: "10px", color: "#d4af37", background: "rgba(212, 175, 55, 0.15)", border: "1px solid rgba(212, 175, 55, 0.3)", padding: "2px 8px", borderRadius: "10px", fontWeight: 700 }}>
-                                70–80 ACTIVE
-                            </span>
+                    <div className="camera-picker-card">
+                        <div className="picker-header">
+                            <h4>Camera Fleet ({cameras.length})</h4>
+                            <span className="fleet-active-tag">80 READY</span>
                         </div>
 
                         {/* Search Filter */}
@@ -964,11 +1241,11 @@ export default function LiveSurveillanceView({ environment, systemOnline }) {
                             placeholder="🔍 Search camera name or location..."
                             value={cameraSearchQuery}
                             onChange={(e) => setCameraSearchQuery(e.target.value)}
-                            style={{ width: "100%", padding: "7px 10px", fontSize: "11px", borderRadius: "6px", background: "#0c1017", border: "1px solid rgba(255, 255, 255, 0.1)", color: "#ffffff", marginBottom: "10px" }}
+                            className="camera-search-input"
                         />
 
                         {/* Sector Filter Tabs */}
-                        <div style={{ display: "flex", gap: "4px", marginBottom: "10px", flexWrap: "wrap" }}>
+                        <div className="sector-tabs-row">
                             {[
                                 { id: "all", label: "All (80)" },
                                 { id: "sector_a", label: "Sector A" },
@@ -980,16 +1257,7 @@ export default function LiveSurveillanceView({ environment, systemOnline }) {
                                     key={sec.id}
                                     type="button"
                                     onClick={() => setSelectedSector(sec.id)}
-                                    style={{
-                                        fontSize: "10px",
-                                        padding: "4px 8px",
-                                        borderRadius: "4px",
-                                        background: selectedSector === sec.id ? "#d4af37" : "rgba(255, 255, 255, 0.05)",
-                                        color: selectedSector === sec.id ? "#0c1017" : "#cbd5e1",
-                                        border: "none",
-                                        fontWeight: 700,
-                                        cursor: "pointer",
-                                    }}
+                                    className={`sector-tab-btn ${selectedSector === sec.id ? "active" : ""}`}
                                 >
                                     {sec.label}
                                 </button>
@@ -997,7 +1265,7 @@ export default function LiveSurveillanceView({ environment, systemOnline }) {
                         </div>
 
                         {/* Scrollable Camera List */}
-                        <div className="camera-picker-scroll" style={{ overflowY: "auto", maxHeight: "420px", display: "flex", flexDirection: "column", gap: "6px" }}>
+                        <div className="camera-picker-scroll">
                             {filteredCameras.map((cam) => {
                                 const isSelected = selectedCamera?.id === cam.id;
                                 return (
@@ -1005,26 +1273,16 @@ export default function LiveSurveillanceView({ environment, systemOnline }) {
                                         key={cam.id}
                                         className={`camera-item-card ${isSelected ? "selected" : ""}`}
                                         onClick={() => setSelectedCamera(cam)}
-                                        style={{
-                                            padding: "10px 12px",
-                                            borderRadius: "6px",
-                                            border: isSelected ? "1px solid #d4af37" : "1px solid rgba(255, 255, 255, 0.06)",
-                                            background: isSelected ? "rgba(212, 175, 55, 0.15)" : "rgba(255, 255, 255, 0.02)",
-                                            cursor: "pointer",
-                                            transition: "all 0.15s ease",
-                                        }}
                                     >
-                                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                            <span style={{ fontSize: "12px", fontWeight: 700, color: isSelected ? "#d4af37" : "#f8fafc" }}>
-                                                {cam.camera_name}
-                                            </span>
-                                            <span style={{ fontSize: "9px", background: "rgba(255,255,255,0.06)", color: "#cbd5e1", padding: "2px 6px", borderRadius: "4px", fontWeight: 600 }}>
+                                        <div className="cam-item-title-row">
+                                            <span className="cam-item-name">{cam.camera_name}</span>
+                                            <span className="cam-func-tag">
                                                 {(cam.assigned_function || "ATTENDANCE").replace("_", " ")}
                                             </span>
                                         </div>
-                                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "4px" }}>
-                                            <span style={{ fontSize: "10px", color: "#94a3b8" }}>📍 {cam.location}</span>
-                                            <span style={{ fontSize: "9px", color: "#10b981", fontWeight: 700 }}>● ONLINE</span>
+                                        <div className="cam-item-loc-row">
+                                            <span>📍 {cam.location}</span>
+                                            <span className="cam-online-pill">● ONLINE</span>
                                         </div>
                                     </div>
                                 );

@@ -368,6 +368,39 @@ export default function OnboardingFlowModal({ environment, isOpen, onClose, onLa
                                 </div>
                             </div>
 
+                            <div style={{ padding: "10px", background: "rgba(0,0,0,0.25)", borderRadius: "6px", border: "1px solid rgba(212,175,55,0.2)", marginBottom: "10px" }}>
+                                <label style={{ fontSize: "10px", color: "#d4af37", textTransform: "uppercase", fontWeight: 700 }}>
+                                    📷 Upload Real Face Verification Photo (for AI Facial Recognition Matching)
+                                </label>
+                                <div style={{ display: "flex", alignItems: "center", gap: "12px", marginTop: "6px" }}>
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={(e) => {
+                                            const file = e.target.files && e.target.files[0];
+                                            if (file) {
+                                                const reader = new FileReader();
+                                                reader.onload = (ev) => {
+                                                    setPhotoUrl(ev.target.result);
+                                                };
+                                                reader.readAsDataURL(file);
+                                            }
+                                        }}
+                                        style={{ fontSize: "11px", color: "#cbd5e1" }}
+                                    />
+                                    {photoUrl && (
+                                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                            <img
+                                                src={photoUrl}
+                                                alt="Enrolled Face"
+                                                style={{ width: "36px", height: "36px", borderRadius: "50%", objectFit: "cover", border: "2px solid #d4af37" }}
+                                            />
+                                            <span style={{ fontSize: "11px", color: "#10b981", fontWeight: 700 }}>✓ Photo Loaded for AI Matching</span>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
                             <div style={{ display: "flex", justifyContent: "flex-end" }}>
                                 <button
                                     type="button"

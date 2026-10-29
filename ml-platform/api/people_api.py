@@ -360,16 +360,31 @@ def enroll_face(person_id: int, req: EnrollFaceRequest):
         if not person:
             raise HTTPException(status_code=404, detail="Person not found")
 
-        embedding = req.embedding or [0.1 * ((i + person_id) % 10) for i in range(128)]
-        embedding_json = json.dumps(embedding)
+        # Extract real facial embedding if photo_url is base64 image
+        extracted = False
+        if req.photo_url and "base64," in req.photo_url:
+            try:
+                import base64
+                from api.face_recognition_service import enroll_person_embedding
 
-        conn.execute(
-            """
-            INSERT INTO face_embeddings (person_id, embedding_json, feature_version)
-            VALUES (?, ?, 'v1')
-        """,
-            (person_id, embedding_json),
-        )
+                b64_data = req.photo_url.split("base64,")[1]
+                img_bytes = base64.b64decode(b64_data)
+                extracted = enroll_person_embedding(person_id, img_bytes)
+            except Exception as ex:
+                print(f"[PeopleAPI] Base64 face embedding extraction error: {ex}")
+
+        if not extracted:
+            embedding = req.embedding or [
+                0.1 * ((i + person_id) % 10) for i in range(128)
+            ]
+            embedding_json = json.dumps(embedding)
+            conn.execute(
+                """
+                INSERT INTO face_embeddings (person_id, embedding_json, feature_version)
+                VALUES (?, ?, 'v2')
+            """,
+                (person_id, embedding_json),
+            )
 
         conn.execute(
             """
@@ -432,6 +447,18 @@ def create_people_batch(req: BatchCreatePeopleRequest):
             )
             pid = cursor.lastrowid
             created.append({"id": pid, "name": p.name, "identifier": p.identifier})
+            # Extract real face embedding if photo was uploaded
+            if p.photo_url and "base64," in p.photo_url:
+                try:
+                    import base64
+                    from api.face_recognition_service import enroll_person_embedding
+
+                    b64_data = p.photo_url.split("base64,")[1]
+                    img_bytes = base64.b64decode(b64_data)
+                    enroll_person_embedding(pid, img_bytes)
+                except Exception as ex:
+                    print(f"Batch face embedding extraction error for {pid}: {ex}")
+
             try:
                 generate_and_save_dossier(pid, conn)
             except Exception as e:
