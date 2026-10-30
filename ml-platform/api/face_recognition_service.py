@@ -147,32 +147,46 @@ def classify_gender_heuristic(face_roi: np.ndarray) -> str:
 
 
 def detect_dress_code_and_id_card(
-    frame: np.ndarray, face_box: Tuple[int, int, int, int]
+    frame: np.ndarray, face_box: Optional[Tuple[int, int, int, int]] = None
 ) -> Dict[str, Any]:
     """
-    Analyzes the torso and neck region below the face to detect:
-    1. Institutional ID Card / Lanyard badge
-    2. Dress code compliance (Formals & Regular Uniform vs Casual)
+    Analyzes the torso and chest region to detect:
+    1. Institutional ID Card / Lanyard badge (presence, location, & aspect ratio)
+    2. Dress code compliance (Formals & Regular Uniform vs Casual Attire)
+    Guaranteed to run for EVERY individual in the frame (enrolled or unenrolled).
     """
     h, w = frame.shape[:2]
-    fx, fy, fw, fh = face_box
 
-    # Define upper torso region below face
-    tx1 = max(0, int(fx - fw * 0.5))
-    tx2 = min(w, int(fx + fw * 1.5))
-    ty1 = min(h, int(fy + fh * 0.95))
-    ty2 = min(h, int(fy + fh * 2.8))
+    if face_box is not None:
+        fx, fy, fw, fh = face_box
+        tx1 = max(0, int(fx - fw * 0.5))
+        tx2 = min(w, int(fx + fw * 1.5))
+        ty1 = min(h, int(fy + fh * 0.95))
+        ty2 = min(h, int(fy + fh * 2.85))
+    else:
+        # Fallback to upper torso region of frame when face isn't directly frontal
+        tx1 = max(0, int(w * 0.22))
+        tx2 = min(w, int(w * 0.78))
+        ty1 = max(0, int(h * 0.28))
+        ty2 = min(h, int(h * 0.85))
 
     if ty2 <= ty1 or tx2 <= tx1:
+        tx1, tx2 = 0, w
+        ty1, ty2 = int(h * 0.2), int(h * 0.8)
+
+    torso_roi = frame[ty1:ty2, tx1:tx2]
+    if torso_roi is None or torso_roi.size == 0:
         return {
             "id_card_detected": False,
             "id_card_status": "ID CARD MISSING • NON-COMPLIANT",
-            "dress_compliant": True,
-            "dress_type": "Regular Formals",
-            "details": "Torso region not fully in frame",
+            "dress_compliant": False,
+            "dress_type": "Casual Attire",
+            "compliance_status": "CRITICAL_VIOLATION",
+            "status_label": "DRESS VIOLATION & ID MISSING",
+            "id_box": None,
+            "details": "Torso region out of frame",
         }
 
-    torso_roi = frame[ty1:ty2, tx1:tx2]
     torso_gray = cv2.cvtColor(torso_roi, cv2.COLOR_BGR2GRAY)
     th, tw = torso_gray.shape[:2]
 
@@ -180,47 +194,85 @@ def detect_dress_code_and_id_card(
     id_card_detected = False
     id_box = None
 
-    # Edge detection for lanyard lines and card badge rectangle
-    edges = cv2.Canny(torso_gray, 40, 120)
+    edges = cv2.Canny(torso_gray, 35, 110)
     contours, _ = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
     for cnt in contours:
         area = cv2.contourArea(cnt)
-        if 250 <= area <= 6000:
+        if 200 <= area <= 7500:
             peri = cv2.arcLength(cnt, True)
             approx = cv2.approxPolyDP(cnt, 0.04 * peri, True)
-            # Rectangle / quadrilateral badge
             if len(approx) == 4:
                 bx, by, bw, bh = cv2.boundingRect(approx)
                 aspect = float(bw) / float(bh)
                 # Typical ID badge aspect ratio (vertical 0.6-0.8 or horizontal 1.3-1.6)
-                if 0.5 <= aspect <= 1.8:
+                if 0.5 <= aspect <= 1.85:
                     id_card_detected = True
                     id_box = [int(tx1 + bx), int(ty1 + by), int(bw), int(bh)]
                     break
 
-    # Color contrast heuristic for white/light ID card badge on chest
+    # Contrast heuristic for white/reflective ID card badge on central chest
     if not id_card_detected:
         center_chest = torso_gray[
-            int(th * 0.25) : int(th * 0.75), int(tw * 0.3) : int(tw * 0.7)
+            int(th * 0.20) : int(th * 0.80), int(tw * 0.25) : int(tw * 0.75)
         ]
         if center_chest.size > 0:
-            bright_pixels = np.count_nonzero(center_chest > 190)
-            total_pixels = center_chest.size
-            if (bright_pixels / float(total_pixels)) > 0.12:
+            bright_pixels = np.count_nonzero(center_chest > 185)
+            if (bright_pixels / float(center_chest.size)) > 0.10:
                 id_card_detected = True
+                id_box = [
+                    int(tx1 + tw * 0.35),
+                    int(ty1 + th * 0.35),
+                    int(tw * 0.30),
+                    int(th * 0.25),
+                ]
 
-    # 2. Dress Code Analysis (Formal Shirt / Regular Uniform vs Multi-colored Casual)
-    # Formals exhibit lower color variance and predominantly solid shades (white, light blue, navy, gray)
+    if id_box is None:
+        id_box = [
+            int(tx1 + tw * 0.35),
+            int(ty1 + th * 0.35),
+            int(tw * 0.30),
+            int(th * 0.25),
+        ]
+
+    # 2. Dress Code Analysis (Solid Formals & School Uniform vs Casual / Printed Attire)
     torso_hsv = cv2.cvtColor(torso_roi, cv2.COLOR_BGR2HSV)
     saturation = torso_hsv[:, :, 1]
     val = torso_hsv[:, :, 2]
     sat_mean = np.mean(saturation)
     val_std = np.std(val)
+    val_mean = np.mean(val)
 
-    # Low-saturation, solid tones indicate formal wear / uniform
-    is_formal = sat_mean < 85 and val_std < 55
-    dress_type = "Regular School Formals" if is_formal else "Casual Attire"
+    # Formals & School Uniforms exhibit low saturation and uniform tones
+    is_formal = sat_mean < 80 and val_std < 55
+
+    if is_formal:
+        if val_mean > 175:
+            dress_type = "Regular Formals (White / Light)"
+        elif val_mean < 80:
+            dress_type = "Regular School Uniform (Dark / Blazer)"
+        else:
+            dress_type = "Regular School Formals"
+        dress_compliant = True
+    else:
+        if sat_mean > 115:
+            dress_type = "Casual Attire (High Saturation)"
+        else:
+            dress_type = "Casual Attire / T-Shirt"
+        dress_compliant = False
+
+    if dress_compliant and id_card_detected:
+        compliance_status = "FULLY_COMPLIANT"
+        status_label = "DRESS & ID COMPLIANT • VERIFIED"
+    elif dress_compliant and not id_card_detected:
+        compliance_status = "ID_MISSING"
+        status_label = "ID CARD MISSING • NON-COMPLIANT"
+    elif not dress_compliant and id_card_detected:
+        compliance_status = "DRESS_VIOLATION"
+        status_label = "CASUAL DRESS VIOLATION • ID VERIFIED"
+    else:
+        compliance_status = "CRITICAL_VIOLATION"
+        status_label = "DRESS VIOLATION & ID MISSING"
 
     return {
         "id_card_detected": id_card_detected,
@@ -230,8 +282,10 @@ def detect_dress_code_and_id_card(
             else "ID CARD MISSING • NON-COMPLIANT"
         ),
         "id_box": id_box,
-        "dress_compliant": is_formal,
+        "dress_compliant": dress_compliant,
         "dress_type": dress_type,
+        "compliance_status": compliance_status,
+        "status_label": status_label,
         "details": f"Attire: {dress_type} | ID Badge: {'Present' if id_card_detected else 'Missing'}",
     }
 
@@ -305,15 +359,16 @@ def analyze_surveillance_frame(
     finally:
         conn.close()
 
-    # 2. Dress Code & ID Card Perception
-    dress_data = {
-        "id_card_detected": False,
-        "id_card_status": "ID CARD NOT DETECTED",
-        "dress_compliant": True,
-        "dress_type": "Regular Formals",
-    }
-    if face_box is not None:
-        dress_data = detect_dress_code_and_id_card(frame, face_box)
+    # 2. Dress Code & ID Card Perception (Always evaluated for EVERY person, enrolled or unenrolled)
+    dress_data = detect_dress_code_and_id_card(frame, face_box)
+
+    # Check custom policy if enrolled
+    if is_match and matched_person:
+        allowed = (matched_person.get("allowed_dress") or "").lower()
+        if "casual" in allowed:
+            dress_data["dress_compliant"] = True
+            dress_data["compliance_status"] = "CUSTOM_POLICY_PASS"
+            dress_data["status_label"] = "CUSTOM POLICY PASS • CASUAL PERMITTED"
 
     # 3. Prohibited Item Perception (Cell Phones, Laptops, etc.)
     prohibited_items = []

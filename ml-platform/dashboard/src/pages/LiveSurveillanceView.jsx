@@ -234,17 +234,50 @@ export default function LiveSurveillanceView({ environment, systemOnline }) {
                                 if (res && res.analysis) {
                                     setLivePerception(res.analysis);
 
+                                    const an = res.analysis;
+                                    const isM = an.is_match && an.matched_person;
+                                    const dr = an.dress_code || {};
+                                    const isDressPass = dr.dress_compliant !== false;
+                                    const hasId = dr.id_card_detected !== false;
+                                    const proh = an.prohibited_items || [];
+                                    const g = (an.detected_gender || "person").toUpperCase();
+
                                     // Update Live Detection Label
-                                    if (res.analysis.is_match && res.analysis.matched_person) {
-                                        const p = res.analysis.matched_person;
+                                    if (proh.length > 0) {
+                                        setDetectionLabel(`🚨 SECURITY ALERT: PROHIBITED ${proh[0].toUpperCase()} DETECTED!`);
+                                    } else if (isM) {
+                                        const p = an.matched_person;
                                         setDetectionLabel(
                                             `⚜️ ${p.name} [${p.identifier}] — Verified (${Math.round(
-                                                res.analysis.similarity * 100
+                                                an.similarity * 100
                                             )}%)`
                                         );
                                     } else {
-                                        const g = (res.analysis.detected_gender || "person").toUpperCase();
-                                        setDetectionLabel(`⚠️ Unknown ${g} — Unregistered Individual`);
+                                        setDetectionLabel(`⚠️ Unknown ${g} — Unenrolled Individual`);
+                                    }
+
+                                    // Autonomous AI Real-Time Broadcast & Speech
+                                    let broadcastText = "";
+                                    if (proh.length > 0) {
+                                        broadcastText = `🚨 SECURITY ALERT: Prohibited ${proh.join(", ")} detected in Sector! Logged to security alerts.`;
+                                    } else if (!isDressPass || !hasId) {
+                                        const who = isM ? an.matched_person.name : `Unenrolled ${g.toLowerCase()}`;
+                                        const violations = [];
+                                        if (!isDressPass) violations.push(`casual attire (${dr.dress_type || "casual"})`);
+                                        if (!hasId) violations.push("missing ID card");
+                                        broadcastText = `⚠️ DRESS CODE NOTICE: ${who} flagged for ${violations.join(" and ")}.`;
+                                    } else if (isM) {
+                                        broadcastText = `⚜️ Autonomous AI: ${an.matched_person.name} verified. Attire: ${dr.dress_type || "Formals"} [Pass] • ID Card: Verified • Attendance: Checked In.`;
+                                    }
+
+                                    if (broadcastText && lastSpokenRef.current !== broadcastText) {
+                                        lastSpokenRef.current = broadcastText;
+                                        setRecentAction({
+                                            type: proh.length > 0 ? "SECURITY" : (!isDressPass || !hasId ? "DRESS_CODE" : "ATTENDANCE"),
+                                            text: broadcastText,
+                                            timestamp: new Date().toLocaleTimeString(),
+                                            badge: proh.length > 0 ? "SECURITY VIOLATION" : (!isDressPass || !hasId ? "DRESS ALERT" : "VERIFIED & NOMINAL"),
+                                        });
                                     }
                                 }
                             } catch (err) {
@@ -366,55 +399,53 @@ export default function LiveSurveillanceView({ environment, systemOnline }) {
                     const bw = Math.round(cw * 0.52);
                     const bh = Math.round(ch * 0.72);
 
-                    // ── Determine Box Styling & Identity Naming ──
-                    let primaryColor = "#cbd5e1"; // Default Brushed Silver for Unregistered
-                    let badgeLabel = "⚠️ UNKNOWN PERSON • UNREGISTERED";
-                    let secondaryTag = "UNIDENTIFIED VISITOR • ENROLL IN DATASET";
-
+                    // ── Unified Tri-Perception Status (Face Attendance + Universal Dress Detection + Security Violations) ──
                     const isMatch = livePerception.is_match && livePerception.matched_person;
                     const matched = livePerception.matched_person;
                     const gender = (livePerception.detected_gender || "person").toUpperCase();
 
-                    if (assignedFunc === "FACE_ATTENDANCE") {
-                        if (isMatch) {
-                            primaryColor = "#d4af37"; // Royal Gold for verified enrolled person
-                            const simPct = Math.round((livePerception.similarity || 0.94) * 100);
-                            badgeLabel = `⚜️ ${matched.name} [${matched.identifier}] • VERIFIED (${simPct}%)`;
-                            secondaryTag = `ROLE: ${matched.role.toUpperCase()} • BIOMETRIC CHECK-IN RECORDED`;
-                        } else {
-                            primaryColor = "#94a3b8"; // Silver/Slate
-                            badgeLabel = `⚠️ UNKNOWN ${gender} • UNREGISTERED`;
-                            secondaryTag = "UNIDENTIFIED INDIVIDUAL • PLEASE REGISTER IN DATASET";
-                        }
-                    } else if (assignedFunc === "DRESS_CODE" || assignedFunc === "DRESS_CODE_PPE") {
-                        const pName = isMatch ? matched.name : `Unknown ${gender}`;
-                        const isCompliant = livePerception.dress_code?.dress_compliant !== false;
-                        const hasId = livePerception.dress_code?.id_card_detected !== false;
+                    // Dress code data guaranteed for EVERY individual (enrolled or unenrolled)
+                    const dress = livePerception.dress_code || {};
+                    const isDressPass = dress.dress_compliant !== false;
+                    const hasIdCard = dress.id_card_detected !== false;
+                    const dressType = (dress.dress_type || (isDressPass ? "Regular Formals" : "Casual Attire")).toUpperCase();
 
-                        primaryColor = isCompliant && hasId ? "#10b981" : "#f59e0b";
-                        badgeLabel = `👔 ${pName} • ${isCompliant ? "REGULAR FORMALS" : "CASUAL ATTIRE"}`;
-                        secondaryTag = hasId
-                            ? "🪪 ID CARD: DETECTED [PASS] • DRESS: COMPLIANT"
-                            : "⚠️ ID CARD: MISSING / NOT VISIBLE • DRESS CHECK";
-                    } else if (assignedFunc === "EXAM_MONITOR") {
-                        const hasCheating =
-                            livePerception.prohibited_items && livePerception.prohibited_items.length > 0;
-                        if (hasCheating) {
-                            primaryColor = "#ef4444";
-                            badgeLabel = "🚨 PROHIBITED SMARTPHONE / NOTES DETECTED";
-                            secondaryTag = "EXAM PROCTORING ALERT: CHEATING FRAUD DETECTED";
-                        } else {
-                            primaryColor = "#38bdf8";
-                            badgeLabel = "📝 EXAMINEE • PROCTORING ACTIVE";
-                            secondaryTag = "PROHIBITED ITEMS: ZERO • SEAT SCAN NOMINAL";
-                        }
-                    } else if (assignedFunc === "PERIMETER_INTRUSION") {
-                        primaryColor = "#f59e0b";
-                        badgeLabel = "🛡️ SENTRY WATCH • PERIMETER ZONE";
-                        secondaryTag = "TRIPWIRE MONITORING: ACTIVE • ZONE ALPHA NOMINAL";
+                    // Security & Prohibited item perception
+                    const prohibited = livePerception.prohibited_items || [];
+                    const hasSecurityViolation = prohibited.length > 0;
+
+                    let primaryColor = "#10b981"; // Emerald green for compliant
+                    if (hasSecurityViolation) {
+                        primaryColor = "#ef4444"; // Red alert
+                    } else if (!isDressPass || !hasIdCard) {
+                        primaryColor = "#f59e0b"; // Amber warning for attire/ID violation
+                    } else if (isMatch) {
+                        primaryColor = "#d4af37"; // Royal Gold for enrolled verified person
                     } else {
-                        primaryColor = "#d4af37";
-                        badgeLabel = isMatch ? `⚜️ ${matched.name}` : `⚠️ UNKNOWN ${gender}`;
+                        primaryColor = "#cbd5e1"; // Brushed Silver for compliant unenrolled individual
+                    }
+
+                    // 1. Primary Identity Header Badge
+                    let badgeLabel = "";
+                    if (hasSecurityViolation) {
+                        badgeLabel = `🚨 SECURITY ALERT: PROHIBITED ${prohibited[0].toUpperCase()} DETECTED!`;
+                    } else if (isMatch) {
+                        const simPct = Math.round((livePerception.similarity || 0.94) * 100);
+                        badgeLabel = `⚜️ ${matched.name} [${matched.identifier}] • VERIFIED (${simPct}%) • ${matched.role.toUpperCase()}`;
+                    } else {
+                        badgeLabel = `⚠️ UNENROLLED ${gender} • UNREGISTERED INDIVIDUAL`;
+                    }
+
+                    // 2. Secondary Telemetry Tag (Attire & ID Verification for EVERY Person)
+                    let secondaryTag = "";
+                    if (!isDressPass && !hasIdCard) {
+                        secondaryTag = `⚠️ DRESS: ${dressType} [VIOLATION] • ⚠️ ID CARD: MISSING [ALERT]`;
+                    } else if (!isDressPass) {
+                        secondaryTag = `⚠️ DRESS: ${dressType} [VIOLATION] • 🪪 ID CARD: VERIFIED [PASS]`;
+                    } else if (!hasIdCard) {
+                        secondaryTag = `👔 DRESS: ${dressType} [COMPLIANT] • ⚠️ ID CARD: MISSING [ALERT]`;
+                    } else {
+                        secondaryTag = `👔 DRESS: ${dressType} [COMPLIANT] • 🪪 ID CARD: VERIFIED [PASS]`;
                     }
 
                     // 1. Draw 2D Technical Bounding Box
@@ -497,30 +528,27 @@ export default function LiveSurveillanceView({ environment, systemOnline }) {
                         ctx.fillText(secondaryTag, bx + 8, by + bh + 19);
                     }
 
-                    // 6. Lively ID Card Chest Box (For Dress Code Function)
-                    if (assignedFunc === "DRESS_CODE" || assignedFunc === "DRESS_CODE_PPE") {
-                        const chestX = bx + Math.round(bw * 0.35);
-                        const chestY = by + Math.round(bh * 0.45);
-                        const chestW = Math.round(bw * 0.3);
-                        const chestH = Math.round(bh * 0.22);
+                    // 6. Lively ID Card Chest Scanner Box (Active for EVERY individual: enrolled or unenrolled)
+                    const chestX = bx + Math.round(bw * 0.35);
+                    const chestY = by + Math.round(bh * 0.42);
+                    const chestW = Math.round(bw * 0.30);
+                    const chestH = Math.round(bh * 0.22);
 
-                        const hasIdCard = livePerception.dress_code?.id_card_detected !== false;
-                        const idCardColor = hasIdCard ? "#10b981" : "#ef4444";
+                    const idCardColor = hasIdCard ? "#10b981" : "#ef4444";
 
-                        ctx.lineWidth = 2;
-                        ctx.setLineDash(hasIdCard ? [] : [4, 4]);
-                        ctx.strokeStyle = idCardColor;
-                        ctx.strokeRect(chestX, chestY, chestW, chestH);
-                        ctx.setLineDash([]);
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash(hasIdCard ? [] : [4, 4]);
+                    ctx.strokeStyle = idCardColor;
+                    ctx.strokeRect(chestX, chestY, chestW, chestH);
+                    ctx.setLineDash([]);
 
-                        const idText = hasIdCard ? "🪪 ID CARD: PRESENT" : "⚠️ ID CARD: MISSING";
-                        ctx.font = "bold 10px 'Inter', sans-serif";
-                        const idM = ctx.measureText(idText);
-                        ctx.fillStyle = "rgba(12, 16, 23, 0.9)";
-                        ctx.fillRect(chestX, chestY - 18, idM.width + 10, 16);
-                        ctx.fillStyle = idCardColor;
-                        ctx.fillText(idText, chestX + 5, chestY - 6);
-                    }
+                    const idText = hasIdCard ? "🪪 ID CARD: VERIFIED [PASS]" : "⚠️ ID CARD: MISSING";
+                    ctx.font = "bold 10px 'Inter', sans-serif";
+                    const idM = ctx.measureText(idText);
+                    ctx.fillStyle = "rgba(12, 16, 23, 0.92)";
+                    ctx.fillRect(chestX, chestY - 18, idM.width + 12, 18);
+                    ctx.fillStyle = idCardColor;
+                    ctx.fillText(idText, chestX + 6, chestY - 5);
 
                     // 7. Sentry Boundary Tripwire (For Perimeter Intrusion)
                     if (assignedFunc === "PERIMETER_INTRUSION") {
@@ -1054,14 +1082,23 @@ export default function LiveSurveillanceView({ environment, systemOnline }) {
                         {snapshotMsg && <div className="snapshot-toast">{snapshotMsg}</div>}
                     </div>
 
-                    {/* Telemetry Information Row */}
+                    {/* Telemetry Information Row with Tri-Perception Badges */}
                     <div className="video-telemetry-strip">
-                        <div className="telemetry-info-left">
+                        <div className="telemetry-info-left" style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
                             <span className="telemetry-item bold">
                                 🎯 Targets: {currentDetectionsCount}
                             </span>
-                            <span className="telemetry-item confidence-text text-gold">
+                            <span className="telemetry-item text-gold" style={{ fontSize: "11px", fontWeight: 700 }}>
                                 {detectionLabel}
+                            </span>
+                            <span className={`badge-pill-${livePerception.dress_code?.dress_compliant !== false ? 'emerald' : 'amber'}`} style={{ fontSize: "10px", padding: "2px 8px" }}>
+                                👔 Attire: {livePerception.dress_code?.dress_type || "Regular Formals"}
+                            </span>
+                            <span className={`badge-pill-${livePerception.dress_code?.id_card_detected !== false ? 'emerald' : 'amber'}`} style={{ fontSize: "10px", padding: "2px 8px" }}>
+                                🪪 ID: {livePerception.dress_code?.id_card_detected !== false ? "Verified" : "Missing"}
+                            </span>
+                            <span className={`badge-pill-${livePerception.prohibited_items?.length ? 'amber' : 'emerald'}`} style={{ fontSize: "10px", padding: "2px 8px" }}>
+                                🛡️ Security: {livePerception.prohibited_items?.length ? `Violation (${livePerception.prohibited_items[0]})` : "Nominal"}
                             </span>
                         </div>
                         <div className="telemetry-info-right">

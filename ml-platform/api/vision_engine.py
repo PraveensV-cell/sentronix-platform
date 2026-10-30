@@ -158,95 +158,93 @@ def process_frame(
     # 4. Function-Specific Rule Evaluation & Alert Logging
     try:
         if conn:
-            # A. FACE_ATTENDANCE
-            if func_upper in ["FACE_ATTENDANCE", "DEFAULT"]:
-                if has_person and matched_person:
-                    person_id = matched_person["id"]
-                    if now - last_attendance_time.get(person_id, 0) > 180:
-                        last_attendance_time[person_id] = now
-                        exists = conn.execute(
-                            "SELECT id FROM attendance_records WHERE person_id = ? AND timestamp LIKE ?",
-                            (person_id, f"{today_str}%"),
-                        ).fetchone()
-                        if not exists:
-                            status = "LATE" if datetime.now().hour >= 9 else "PRESENT"
-                            conn.execute(
-                                """
-                                INSERT INTO attendance_records (person_id, camera_id, environment_id, timestamp, confidence, status)
-                                VALUES (?, ?, 1, ?, 0.94, ?)
-                            """,
-                                (person_id, camera_id, now_str, status),
-                            )
-                            conn.commit()
-                            try:
-                                record_ai_event(
-                                    "ATTENDANCE",
-                                    f"Automated check-in verified for {matched_person['name']} ({matched_person.get('identifier', 'ID')}) as {status}.",
-                                )
-                                generate_and_save_dossier(person_id, conn)
-                            except Exception:
-                                pass
-
-            # B. DRESS_CODE / DRESS_CODE_PPE: Formals & Regular School Dress Policy
-            elif func_upper in ["DRESS_CODE", "DRESS_CODE_PPE"]:
-                if has_person:
-                    # Check upper body / clothing analysis
-                    # Allowed: Formals & Regular School Dress. If casual detected, alert!
-                    if matched_person:
-                        allowed = (
-                            matched_person.get("allowed_dress")
-                            or "Formals & Regular Uniform"
-                        )
-                    else:
-                        allowed = "Formals & Regular Uniform"
-
-                    # Check for dress violation alert cooldown
-                    if now - last_alert_time.get("dress_code_alert", 0) > 40:
-                        last_alert_time["dress_code_alert"] = now
-                        p_name = (
-                            matched_person["name"]
-                            if matched_person
-                            else "Unknown Student"
-                        )
+            # ── PILLAR 1: FACE ATTENDANCE (Auto-checkin for enrolled identities) ──
+            if has_person and matched_person:
+                person_id = matched_person["id"]
+                if now - last_attendance_time.get(person_id, 0) > 180:
+                    last_attendance_time[person_id] = now
+                    exists = conn.execute(
+                        "SELECT id FROM attendance_records WHERE person_id = ? AND timestamp LIKE ?",
+                        (person_id, f"{today_str}%"),
+                    ).fetchone()
+                    if not exists:
+                        status = "LATE" if datetime.now().hour >= 9 else "PRESENT"
                         conn.execute(
                             """
-                            INSERT INTO alerts (timestamp, object, priority, confidence, status, camera_id)
-                            VALUES (?, ?, 'MEDIUM', 0.91, 'ACTIVE', ?)
-                        """,
-                            (
-                                now_str,
-                                f"DRESS CODE CHECK: {p_name} - Verified for {allowed}",
-                                str(camera_id),
-                            ),
+                            INSERT INTO attendance_records (person_id, camera_id, environment_id, timestamp, confidence, status)
+                            VALUES (?, ?, 1, ?, 0.94, ?)
+                            """,
+                            (person_id, camera_id, now_str, status),
                         )
                         conn.commit()
+                        try:
+                            record_ai_event(
+                                "ATTENDANCE",
+                                f"Automated check-in verified for {matched_person['name']} ({matched_person.get('identifier', 'ID')}) as {status}.",
+                            )
+                            generate_and_save_dossier(person_id, conn)
+                        except Exception:
+                            pass
 
-            # C. EXAM_MONITOR: Prohibited Smartphone, Notes & Cheating Activity
-            elif func_upper in ["EXAM_MONITOR", "PROHIBITED_ACTIVITY"]:
-                # Check for cell phone or prohibited objects
-                cell_phones = [
-                    d
-                    for d in detected_objects
-                    if d["name"] in ["cell phone", "laptop", "book"]
-                ]
-                if cell_phones and (
-                    now - last_alert_time.get("exam_violation", 0) > 30
+            # ── PILLAR 2: DRESS CODE & ID CARD COMPLIANCE (FOR EVERY PERSON: ENROLLED OR UNENROLLED) ──
+            if has_person:
+                dress_inf = (
+                    analysis.get("dress_code", {}) if "analysis" in locals() else {}
+                )
+                is_pass = dress_inf.get("dress_compliant", True)
+                has_badge = dress_inf.get("id_card_detected", False)
+                dtype = dress_inf.get("dress_type", "Regular Formals")
+                p_display = (
+                    matched_person["name"]
+                    if matched_person
+                    else f"Unenrolled Individual ({analysis.get('detected_gender', 'Person') if 'analysis' in locals() else 'Person'})"
+                )
+
+                if (not is_pass or not has_badge) and (
+                    now - last_alert_time.get("dress_code_alert", 0) > 30
                 ):
-                    last_alert_time["exam_violation"] = now
-                    item = cell_phones[0]["name"].upper()
+                    last_alert_time["dress_code_alert"] = now
+                    reasons = []
+                    if not is_pass:
+                        reasons.append(f"Casual Attire ({dtype})")
+                    if not has_badge:
+                        reasons.append("Missing ID Card")
+                    v_reason = " & ".join(reasons)
                     conn.execute(
                         """
                         INSERT INTO alerts (timestamp, object, priority, confidence, status, camera_id)
-                        VALUES (?, ?, 'CRITICAL', ?, 'ACTIVE', ?)
-                    """,
+                        VALUES (?, ?, 'HIGH', 0.92, 'ACTIVE', ?)
+                        """,
                         (
                             now_str,
-                            f"EXAM HALL PROHIBITED ITEM DETECTED: {item} USAGE DURING EXAMINATION",
-                            cell_phones[0]["conf"],
+                            f"DRESS CODE VIOLATION: {p_display} - {v_reason} detected (Policy requires Formals & Uniform)",
                             str(camera_id),
                         ),
                     )
                     conn.commit()
+
+            # ── PILLAR 3: SECURITY & PROHIBITED ACTIVITY / EXAM CHEATING DETECTION ──
+            cell_phones = [
+                d
+                for d in detected_objects
+                if d["name"] in ["cell phone", "laptop", "book"]
+            ]
+            if cell_phones and (now - last_alert_time.get("exam_violation", 0) > 30):
+                last_alert_time["exam_violation"] = now
+                item = cell_phones[0]["name"].upper()
+                conn.execute(
+                    """
+                    INSERT INTO alerts (timestamp, object, priority, confidence, status, camera_id)
+                    VALUES (?, ?, 'CRITICAL', ?, 'ACTIVE', ?)
+                    """,
+                    (
+                        now_str,
+                        f"PROHIBITED ITEM DETECTED: {item} USAGE VIOLATION IN SURVEILLANCE SECTOR",
+                        cell_phones[0]["conf"],
+                        str(camera_id),
+                    ),
+                )
+                conn.commit()
 
             # D. PERIMETER_INTRUSION
             elif func_upper in ["PERIMETER_INTRUSION", "RESTRICTED_ZONE"]:

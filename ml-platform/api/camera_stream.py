@@ -26,6 +26,7 @@ camera_locks = {}
 camera_threads = {}
 camera_frames = {}
 camera_running = {}
+stream_alert_cooldown = {}
 camera_info = {}
 mobile_uploaded_frames = {}  # {camera_id: {"frame": np.ndarray, "timestamp": float}}
 
@@ -316,7 +317,10 @@ async def upload_camera_frame(camera_id: str, file: UploadFile = File(...)):
         assigned_function=assigned_function,
     )
 
-    # If verified face match on Attendance function, mark present
+    now_ts = time.time()
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    # PILLAR 1: Face Attendance (Auto-mark present for enrolled identities)
     if analysis.get("is_match") and analysis.get("matched_person"):
         p_id = analysis["matched_person"]["id"]
         try:
@@ -327,7 +331,6 @@ async def upload_camera_frame(camera_id: str, file: UploadFile = File(...)):
                 (p_id, f"{today_str}%"),
             ).fetchone()
             if not existing:
-                now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 status = "LATE" if datetime.now().hour >= 9 else "PRESENT"
                 conn.execute(
                     """
@@ -347,6 +350,77 @@ async def upload_camera_frame(camera_id: str, file: UploadFile = File(...)):
             conn.close()
         except Exception as e:
             print(f"[CameraStream] Attendance recording error: {e}")
+
+    # PILLAR 2: Dress Code & ID Card Compliance (Evaluated for EVERY person: enrolled or unenrolled)
+    dress = analysis.get("dress_code")
+    if dress:
+        is_dress_pass = dress.get("dress_compliant", True)
+        has_id = dress.get("id_card_detected", False)
+        dress_type = dress.get("dress_type", "Regular Formals")
+
+        # Log alert if wearing casual attire or ID card is missing
+        if not is_dress_pass or not has_id:
+            person_name = (
+                analysis["matched_person"]["name"]
+                if analysis.get("is_match") and analysis.get("matched_person")
+                else f"Unenrolled {analysis.get('detected_gender', 'Individual').capitalize()}"
+            )
+            cooldown_key = f"dress_{camera_id}_{person_name}"
+            if now_ts - stream_alert_cooldown.get(cooldown_key, 0) > 25:
+                stream_alert_cooldown[cooldown_key] = now_ts
+                try:
+                    conn = get_db_connection()
+                    reasons = []
+                    if not is_dress_pass:
+                        reasons.append(f"Casual Attire ({dress_type})")
+                    if not has_id:
+                        reasons.append("Missing ID Card")
+                    violation_detail = " & ".join(reasons)
+                    priority = (
+                        "HIGH" if (not is_dress_pass and not has_id) else "MEDIUM"
+                    )
+
+                    conn.execute(
+                        """
+                        INSERT INTO alerts (timestamp, object, priority, confidence, status, camera_id)
+                        VALUES (?, ?, ?, 0.92, 'ACTIVE', ?)
+                        """,
+                        (
+                            now_str,
+                            f"DRESS CODE VIOLATION: {person_name} — {violation_detail} detected",
+                            priority,
+                            str(camera_id),
+                        ),
+                    )
+                    conn.commit()
+                    conn.close()
+                except Exception as e:
+                    print(f"[CameraStream] Dress alert error: {e}")
+
+    # PILLAR 3: Security & Prohibited Activities (Smartphones, Cheating, Weapons)
+    prohibited = analysis.get("prohibited_items", [])
+    if prohibited:
+        item = prohibited[0].upper()
+        sec_key = f"sec_{camera_id}_{item}"
+        if now_ts - stream_alert_cooldown.get(sec_key, 0) > 25:
+            stream_alert_cooldown[sec_key] = now_ts
+            try:
+                conn = get_db_connection()
+                conn.execute(
+                    """
+                    INSERT INTO alerts (timestamp, object, priority, confidence, status, camera_id)
+                    VALUES (?, ?, 'CRITICAL', 0.96, 'ACTIVE', ?)
+                    """,
+                    (
+                        now_str,
+                        f"CRITICAL SECURITY ALERT: PROHIBITED {item} DETECTED IN CAMERA FEED",
+                        str(camera_id),
+                    ),
+                )
+                conn.commit()
+                conn.close()
+            except Exception as e:
+                print(f"[CameraStream] Security alert error: {e}")
 
     # Ensure worker thread is initialized
     get_camera(str_id)
