@@ -1272,25 +1272,8 @@ def seed_default_environment_and_rules():
             (cam_id, grp_id, name, src_type, src_url, loc, zone, func),
         )
 
-    # Seed Demo Enrolled People (Students and Staff)
-    cursor.execute(
-        """
-        INSERT OR IGNORE INTO people (id, environment_id, identifier, name, role, department, class_grade, is_enrolled, status)
-        VALUES (1, 1, 'STU-101', 'Aarav Sharma', 'student', 'Science', 'Grade 10-A', 1, 'active')
-    """
-    )
-    cursor.execute(
-        """
-        INSERT OR IGNORE INTO people (id, environment_id, identifier, name, role, department, class_grade, is_enrolled, status)
-        VALUES (2, 1, 'STU-102', 'Diya Patel', 'student', 'Science', 'Grade 10-A', 1, 'active')
-    """
-    )
-    cursor.execute(
-        """
-        INSERT OR IGNORE INTO people (id, environment_id, identifier, name, role, department, class_grade, is_enrolled, status)
-        VALUES (3, 1, 'STF-501', 'Dr. Ramesh Kumar', 'staff', 'Faculty of Physics', 'Staff', 1, 'active')
-    """
-    )
+    # Real user-enrolled people only (no fake demo people seeded)
+    pass
 
     # Seed Baseline Safety & Attendance Rules
     rule1_cond = json.dumps({"target": "fire", "min_confidence": 0.65})

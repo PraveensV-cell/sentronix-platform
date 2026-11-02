@@ -5,7 +5,7 @@ export default function AIAssistantWidget({ isOpen, onClose }) {
     const [messages, setMessages] = useState([
         {
             sender: "assistant",
-            text: "Hello, I am the Sentronix AI Surveillance Operations Assistant. How can I assist you with cameras, attendance, or alerts today?",
+            text: "Hello, I am the VANTEP AI (JARVIS Class Autonomous Intelligence). How can I assist you with cameras, attendance, or alerts today?",
             time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         }
     ]);

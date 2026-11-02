@@ -40,8 +40,8 @@
 .soc-navbar {
     height: 54px;
     background-color: var(--bg-panel);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
+    
+    
     border-bottom: 1px solid var(--border-color);
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
     display: flex;
@@ -350,8 +350,8 @@
     margin-bottom: 14px;
     flex-wrap: wrap;
     gap: 12px;
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
+    
+    
 }
 
 /* Light mode Red highlights */
@@ -455,8 +455,8 @@
     align-items: center;
     box-shadow: var(--card-shadow);
     margin-bottom: 14px;
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    
+    
 }
 
 .ai-crest-icon {
@@ -540,7 +540,7 @@
     padding: 2px 8px;
     border-radius: 8px;
     font-weight: 700;
-    backdrop-filter: blur(8px);
+    
 }
 
 .stage-sub {
@@ -566,7 +566,7 @@
     background: rgba(16, 185, 129, 0.12);
     border: 1px solid rgba(16, 185, 129, 0.3);
     color: #10b981;
-    backdrop-filter: blur(8px);
+    
 }
 
 .live-dot-pulse {
@@ -1056,7 +1056,7 @@
     border-radius: 8px;
     font-size: 12px;
     font-weight: 700;
-    backdrop-filter: blur(8px);
+    
 }
 
 .external-plug-toast {
@@ -1079,7 +1079,7 @@
     flex-direction: column;
     gap: 4px;
     font-size: 11px;
-    backdrop-filter: blur(8px);
+    
 }
 
 .advice-item {
@@ -1161,8 +1161,8 @@
     position: fixed;
     inset: 0;
     background-color: rgba(0, 0, 0, 0.7);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    
+    
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1179,8 +1179,8 @@
     width: 100%;
     max-width: 520px;
     overflow: hidden;
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
+    
+    
 }
 
 .modal-dialog-large {

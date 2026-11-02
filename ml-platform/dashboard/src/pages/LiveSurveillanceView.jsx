@@ -393,162 +393,171 @@ export default function LiveSurveillanceView({ environment, systemOnline }) {
                         } catch (err) {}
                     }
 
-                    // ── Primary Bounding Box Coordinates ──
-                    const bx = Math.round(cw * 0.24);
-                    const by = Math.round(ch * 0.16);
-                    const bw = Math.round(cw * 0.52);
-                    const bh = Math.round(ch * 0.72);
+                    // ─── Real Subject Perception & 2D Bounding Box (Only when subject detected) ───
+                    const hasFace = Boolean(livePerception.face_detected);
 
-                    // ── Unified Tri-Perception Status (Face Attendance + Universal Dress Detection + Security Violations) ──
-                    const isMatch = livePerception.is_match && livePerception.matched_person;
-                    const matched = livePerception.matched_person;
-                    const gender = (livePerception.detected_gender || "person").toUpperCase();
+                    if (hasFace) {
+                        const scaleX = cw / (video.videoWidth || cw);
+                        const scaleY = ch / (video.videoHeight || ch);
 
-                    // Dress code data guaranteed for EVERY individual (enrolled or unenrolled)
-                    const dress = livePerception.dress_code || {};
-                    const isDressPass = dress.dress_compliant !== false;
-                    const hasIdCard = dress.id_card_detected !== false;
-                    const dressType = (dress.dress_type || (isDressPass ? "Regular Formals" : "Casual Attire")).toUpperCase();
+                        let bx, by, bw, bh;
+                        if (livePerception.face_box && Array.isArray(livePerception.face_box)) {
+                            const [fx, fy, fw, fh] = livePerception.face_box;
+                            bx = Math.round(Math.max(0, fx - fw * 0.35) * scaleX);
+                            by = Math.round(Math.max(0, fy - fh * 0.25) * scaleY);
+                            bw = Math.round((fw * 1.7) * scaleX);
+                            bh = Math.round((fh * 3.0) * scaleY);
+                        } else {
+                            bx = Math.round(cw * 0.24);
+                            by = Math.round(ch * 0.16);
+                            bw = Math.round(cw * 0.52);
+                            bh = Math.round(ch * 0.72);
+                        }
 
-                    // Security & Prohibited item perception
-                    const prohibited = livePerception.prohibited_items || [];
-                    const hasSecurityViolation = prohibited.length > 0;
+                        bx = Math.max(8, Math.min(cw - 80, bx));
+                        by = Math.max(34, Math.min(ch - 80, by));
+                        bw = Math.min(cw - bx - 8, bw);
+                        bh = Math.min(ch - by - 8, bh);
 
-                    let primaryColor = "#10b981"; // Emerald green for compliant
-                    if (hasSecurityViolation) {
-                        primaryColor = "#ef4444"; // Red alert
-                    } else if (!isDressPass || !hasIdCard) {
-                        primaryColor = "#f59e0b"; // Amber warning for attire/ID violation
-                    } else if (isMatch) {
-                        primaryColor = "#d4af37"; // Royal Gold for enrolled verified person
-                    } else {
-                        primaryColor = "#cbd5e1"; // Brushed Silver for compliant unenrolled individual
-                    }
+                        const isMatch = livePerception.is_match && livePerception.matched_person;
+                        const matched = livePerception.matched_person;
+                        const gender = (livePerception.detected_gender || 'person').toUpperCase();
 
-                    // 1. Primary Identity Header Badge
-                    let badgeLabel = "";
-                    if (hasSecurityViolation) {
-                        badgeLabel = `🚨 SECURITY ALERT: PROHIBITED ${prohibited[0].toUpperCase()} DETECTED!`;
-                    } else if (isMatch) {
-                        const simPct = Math.round((livePerception.similarity || 0.94) * 100);
-                        badgeLabel = `⚜️ ${matched.name} [${matched.identifier}] • VERIFIED (${simPct}%) • ${matched.role.toUpperCase()}`;
-                    } else {
-                        badgeLabel = `⚠️ UNENROLLED ${gender} • UNREGISTERED INDIVIDUAL`;
-                    }
+                        const dress = livePerception.dress_code || {};
+                        const isDressPass = dress.dress_compliant !== false;
+                        const hasIdCard = dress.id_card_detected !== false;
+                        const dressType = (dress.dress_type || (isDressPass ? 'Regular Formals' : 'Casual Attire')).toUpperCase();
 
-                    // 2. Secondary Telemetry Tag (Attire & ID Verification for EVERY Person)
-                    let secondaryTag = "";
-                    if (!isDressPass && !hasIdCard) {
-                        secondaryTag = `⚠️ DRESS: ${dressType} [VIOLATION] • ⚠️ ID CARD: MISSING [ALERT]`;
-                    } else if (!isDressPass) {
-                        secondaryTag = `⚠️ DRESS: ${dressType} [VIOLATION] • 🪪 ID CARD: VERIFIED [PASS]`;
-                    } else if (!hasIdCard) {
-                        secondaryTag = `👔 DRESS: ${dressType} [COMPLIANT] • ⚠️ ID CARD: MISSING [ALERT]`;
-                    } else {
-                        secondaryTag = `👔 DRESS: ${dressType} [COMPLIANT] • 🪪 ID CARD: VERIFIED [PASS]`;
-                    }
+                        const prohibited = livePerception.prohibited_items || [];
+                        const hasSecurityViolation = prohibited.length > 0;
 
-                    // 1. Draw 2D Technical Bounding Box
-                    ctx.lineWidth = 2;
-                    ctx.strokeStyle = primaryColor;
-                    ctx.strokeRect(bx, by, bw, bh);
+                        let primaryColor = '#10b981';
+                        if (hasSecurityViolation) {
+                            primaryColor = '#ef4444';
+                        } else if (!isDressPass || !hasIdCard) {
+                            primaryColor = '#f59e0b';
+                        } else if (isMatch) {
+                            primaryColor = '#d4af37';
+                        } else {
+                            primaryColor = '#38bdf8';
+                        }
 
-                    // 2. Corner Bracket Accents
-                    const cLen = 24;
-                    ctx.lineWidth = 4;
-                    ctx.strokeStyle = "#ffffff";
+                        let badgeLabel = '';
+                        if (hasSecurityViolation) {
+                            badgeLabel = `🚨 SECURITY ALERT: PROHIBITED ${prohibited[0].toUpperCase()} DETECTED!`;
+                        } else if (isMatch) {
+                            const simPct = Math.round((livePerception.similarity || 0.94) * 100);
+                            badgeLabel = `✓ ${matched.name} [${matched.identifier}] • VERIFIED (${simPct}%) • ${matched.role.toUpperCase()}`;
+                        } else {
+                            badgeLabel = `⚠️ UNREGISTERED ${gender} • VISITOR`;
+                        }
 
-                    // Top-Left
-                    ctx.beginPath();
-                    ctx.moveTo(bx, by + cLen);
-                    ctx.lineTo(bx, by);
-                    ctx.lineTo(bx + cLen, by);
-                    ctx.stroke();
+                        let secondaryTag = '';
+                        if (!isDressPass && !hasIdCard) {
+                            secondaryTag = `👔 DRESS: ${dressType} [VIOLATION] • 🪪 ID: MISSING [ALERT]`;
+                        } else if (!isDressPass) {
+                            secondaryTag = `👔 DRESS: ${dressType} [VIOLATION] • 🪪 ID: VERIFIED [PASS]`;
+                        } else if (!hasIdCard) {
+                            secondaryTag = `👔 DRESS: ${dressType} [COMPLIANT] • 🪪 ID: MISSING [ALERT]`;
+                        } else {
+                            secondaryTag = `👔 DRESS: ${dressType} [COMPLIANT] • 🪪 ID: VERIFIED [PASS]`;
+                        }
 
-                    // Top-Right
-                    ctx.beginPath();
-                    ctx.moveTo(bx + bw - cLen, by);
-                    ctx.lineTo(bx + bw, by);
-                    ctx.lineTo(bx + bw, by + cLen);
-                    ctx.stroke();
+                        // 1. Draw 2D Technical Bounding Box
+                        ctx.lineWidth = 2;
+                        ctx.strokeStyle = primaryColor;
+                        ctx.strokeRect(bx, by, bw, bh);
 
-                    // Bottom-Left
-                    ctx.beginPath();
-                    ctx.moveTo(bx, by + bh - cLen);
-                    ctx.lineTo(bx, by + bh);
-                    ctx.lineTo(bx + cLen, by + bh);
-                    ctx.stroke();
+                        // 2. Corner Bracket Accents
+                        const cLen = 22;
+                        ctx.lineWidth = 4;
+                        ctx.strokeStyle = '#ffffff';
 
-                    // Bottom-Right
-                    ctx.beginPath();
-                    ctx.moveTo(bx + bw - cLen, by + bh);
-                    ctx.lineTo(bx + bw, by + bh);
-                    ctx.lineTo(bx + bw, by + bh - cLen);
-                    ctx.stroke();
+                        ctx.beginPath();
+                        ctx.moveTo(bx, by + cLen); ctx.lineTo(bx, by); ctx.lineTo(bx + cLen, by);
+                        ctx.moveTo(bx + bw - cLen, by); ctx.lineTo(bx + bw, by); ctx.lineTo(bx + bw, by + cLen);
+                        ctx.moveTo(bx, by + bh - cLen); ctx.lineTo(bx, by + bh); ctx.lineTo(bx + cLen, by + bh);
+                        ctx.moveTo(bx + bw - cLen, by + bh); ctx.lineTo(bx + bw, by + bh); ctx.lineTo(bx + bw, by + bh - cLen);
+                        ctx.stroke();
 
-                    // 3. Center Target Reticle Crosshairs
-                    const cx = bx + bw / 2;
-                    const cy = by + bh / 2;
-                    ctx.lineWidth = 1;
-                    ctx.strokeStyle = "rgba(212, 175, 55, 0.4)";
-                    ctx.beginPath();
-                    ctx.moveTo(cx - 16, cy);
-                    ctx.lineTo(cx + 16, cy);
-                    ctx.moveTo(cx, cy - 16);
-                    ctx.lineTo(cx, cy + 16);
-                    ctx.stroke();
+                        // 3. Primary Identity Header Badge
+                        ctx.font = "bold 12px 'Inter', sans-serif";
+                        const textMetrics = ctx.measureText(badgeLabel);
+                        const badgeW = textMetrics.width + 24;
+                        const badgeH = 26;
 
-                    // 4. Primary Identity Header Badge
-                    ctx.font = "bold 12px 'Inter', sans-serif";
-                    const textMetrics = ctx.measureText(badgeLabel);
-                    const badgeW = textMetrics.width + 24;
-                    const badgeH = 26;
-
-                    ctx.fillStyle = "rgba(12, 16, 23, 0.94)";
-                    ctx.fillRect(bx, by - badgeH - 2, badgeW, badgeH);
-                    ctx.lineWidth = 1;
-                    ctx.strokeStyle = primaryColor;
-                    ctx.strokeRect(bx, by - badgeH - 2, badgeW, badgeH);
-
-                    ctx.fillStyle = primaryColor;
-                    ctx.fillText(badgeLabel, bx + 12, by - 9);
-
-                    // 5. Secondary Telemetry Footer Badge
-                    if (secondaryTag) {
-                        ctx.font = "600 11px 'Inter', sans-serif";
-                        const subMetrics = ctx.measureText(secondaryTag);
-                        const subW = subMetrics.width + 16;
-                        ctx.fillStyle = "rgba(12, 16, 23, 0.9)";
-                        ctx.fillRect(bx, by + bh + 4, subW, 22);
+                        ctx.fillStyle = 'rgba(12, 16, 23, 0.94)';
+                        ctx.fillRect(bx, by - badgeH - 2, badgeW, badgeH);
                         ctx.lineWidth = 1;
-                        ctx.strokeStyle = "rgba(255, 255, 255, 0.15)";
-                        ctx.strokeRect(bx, by + bh + 4, subW, 22);
+                        ctx.strokeStyle = primaryColor;
+                        ctx.strokeRect(bx, by - badgeH - 2, badgeW, badgeH);
 
-                        ctx.fillStyle = "#f8fafc";
-                        ctx.fillText(secondaryTag, bx + 8, by + bh + 19);
+                        ctx.fillStyle = primaryColor;
+                        ctx.fillText(badgeLabel, bx + 12, by - 9);
+
+                        // 4. Secondary Telemetry Footer Badge
+                        if (secondaryTag) {
+                            ctx.font = "600 11px 'Inter', sans-serif";
+                            const subMetrics = ctx.measureText(secondaryTag);
+                            const subW = subMetrics.width + 16;
+                            ctx.fillStyle = 'rgba(12, 16, 23, 0.9)';
+                            ctx.fillRect(bx, by + bh + 4, subW, 22);
+                            ctx.lineWidth = 1;
+                            ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+                            ctx.strokeRect(bx, by + bh + 4, subW, 22);
+
+                            ctx.fillStyle = '#f8fafc';
+                            ctx.fillText(secondaryTag, bx + 8, by + bh + 19);
+                        }
+
+                        // 5. ID Card Chest Scanner Box
+                        const chestX = bx + Math.round(bw * 0.35);
+                        const chestY = by + Math.round(bh * 0.40);
+                        const chestW = Math.round(bw * 0.30);
+                        const chestH = Math.round(bh * 0.22);
+                        const idCardColor = hasIdCard ? '#10b981' : '#ef4444';
+
+                        ctx.lineWidth = 2;
+                        ctx.setLineDash(hasIdCard ? [] : [4, 4]);
+                        ctx.strokeStyle = idCardColor;
+                        ctx.strokeRect(chestX, chestY, chestW, chestH);
+                        ctx.setLineDash([]);
+
+                        const idText = hasIdCard ? '🪪 ID CARD: VERIFIED' : '⚠️ ID CARD: MISSING';
+                        ctx.font = "bold 10px 'Inter', sans-serif";
+                        const idM = ctx.measureText(idText);
+                        ctx.fillStyle = 'rgba(12, 16, 23, 0.92)';
+                        ctx.fillRect(chestX, chestY - 18, idM.width + 12, 18);
+                        ctx.fillStyle = idCardColor;
+                        ctx.fillText(idText, chestX + 6, chestY - 5);
+                    } else {
+                        // ─── Standby Mode: Waiting silently for subject ───
+                        const cx = Math.round(cw / 2);
+                        const cy = Math.round(ch / 2);
+
+                        ctx.lineWidth = 1;
+                        ctx.strokeStyle = 'rgba(212, 175, 55, 0.25)';
+                        ctx.beginPath();
+                        ctx.arc(cx, cy, 38, 0, Math.PI * 2);
+                        ctx.stroke();
+
+                        ctx.beginPath();
+                        ctx.moveTo(cx - 50, cy); ctx.lineTo(cx + 50, cy);
+                        ctx.moveTo(cx, cy - 50); ctx.lineTo(cx, cy + 50);
+                        ctx.stroke();
+
+                        const standbyText = 'VANTEP AI • OPTICS ACTIVE • SCANNING FOR SUBJECT';
+                        ctx.font = "700 11px 'Inter', sans-serif";
+                        const sM = ctx.measureText(standbyText);
+                        const sW = sM.width + 20;
+
+                        ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+                        ctx.fillRect(cx - sW / 2, cy + 55, sW, 24);
+                        ctx.strokeStyle = 'rgba(212, 175, 55, 0.3)';
+                        ctx.strokeRect(cx - sW / 2, cy + 55, sW, 24);
+                        ctx.fillStyle = '#cbd5e1';
+                        ctx.fillText(standbyText, cx - sW / 2 + 10, cy + 71);
                     }
-
-                    // 6. Lively ID Card Chest Scanner Box (Active for EVERY individual: enrolled or unenrolled)
-                    const chestX = bx + Math.round(bw * 0.35);
-                    const chestY = by + Math.round(bh * 0.42);
-                    const chestW = Math.round(bw * 0.30);
-                    const chestH = Math.round(bh * 0.22);
-
-                    const idCardColor = hasIdCard ? "#10b981" : "#ef4444";
-
-                    ctx.lineWidth = 2;
-                    ctx.setLineDash(hasIdCard ? [] : [4, 4]);
-                    ctx.strokeStyle = idCardColor;
-                    ctx.strokeRect(chestX, chestY, chestW, chestH);
-                    ctx.setLineDash([]);
-
-                    const idText = hasIdCard ? "🪪 ID CARD: VERIFIED [PASS]" : "⚠️ ID CARD: MISSING";
-                    ctx.font = "bold 10px 'Inter', sans-serif";
-                    const idM = ctx.measureText(idText);
-                    ctx.fillStyle = "rgba(12, 16, 23, 0.92)";
-                    ctx.fillRect(chestX, chestY - 18, idM.width + 12, 18);
-                    ctx.fillStyle = idCardColor;
-                    ctx.fillText(idText, chestX + 6, chestY - 5);
 
                     // 7. Sentry Boundary Tripwire (For Perimeter Intrusion)
                     if (assignedFunc === "PERIMETER_INTRUSION") {

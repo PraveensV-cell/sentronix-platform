@@ -1,90 +1,73 @@
 import { useState, useEffect } from "react";
-import { getEnvironments, createEnvironment, updateEnvironment, updateEnvironmentFeatures } from "../api/api";
+import { getEnvironments, createEnvironment, updateEnvironment } from "../api/api";
 import OnboardingFlowModal from "../components/OnboardingFlowModal";
 
-const MODE_CAPABILITIES = {
-    School: {
-        title: "🏛️ Academic Campus & School Safety",
-        tagline: "Educational Campus Surveillance • Uniform Standards • Biometric Attendance",
+const FOUR_MODES = [
+    {
+        type: "School",
+        title: "Campus & School Mode",
+        tagline: "Academic Surveillance • Uniform Standards • Biometric Attendance",
+        icon: "🎓",
         themeClass: "mode-campus",
         bgImg: "https://images.unsplash.com/photo-1541339907198-e08756dedf3f?w=1920&q=80",
         functions: [
-            { id: "attendance", name: "Face Biometric Attendance", icon: "🎓", desc: "Automated scan, timestamping, deduplication, and mark PRESENT/LATE in real-time." },
-            { id: "dress_code", name: "Dress Code & School Uniform", icon: "👔", desc: "Permits formals and regular uniform; flags casual clothes & non-compliant attire." },
-            { id: "exam_monitor", name: "Exam Hall Proctoring", icon: "📝", desc: "Detects prohibited cell phones, cheat notes, laptops, and suspicious postures." },
-            { id: "safety", name: "Anti-Ragging & Campus Safety", icon: "🛡️", desc: "Crowd gathering, corridor aggression, and unauthorized perimeter presence." },
-            { id: "dossier", name: "Individual Student/Staff Dossiers", icon: "📁", desc: "Dedicated physical dossier file updated in real-time by AI for every individual." },
+            { name: "Face Biometric Attendance", icon: "⏱️", desc: "Automated facial recognition, exact timestamping, and present/late deduplication." },
+            { name: "Dress Code & School Uniform", icon: "👔", desc: "Enforces formal dress & regular school uniform; flags casual clothes & checks ID badge." },
+            { name: "Exam Hall Proctoring", icon: "📝", desc: "Detects prohibited cell phones, cheat sheets/notes, unauthorized devices & malpractice." },
+            { name: "Anti-Ragging & Campus Safety", icon: "🛡️", desc: "Monitors aggressive clustering, hallway scuffles, and unauthorized perimeter presence." },
         ],
     },
-    Military: {
-        title: "🛡️ Military & Strategic Defense Command",
-        tagline: "High-Security Perimeter Watch • Tactical Defense • Sentry Enforcement",
+    {
+        type: "Military",
+        title: "Military & Defence Mode",
+        tagline: "Strategic Perimeter Watch • Tactical Defense • Sentry Enforcement",
+        icon: "🎖️",
         themeClass: "mode-military",
         bgImg: "https://images.unsplash.com/photo-1508873696983-2df570464756?w=1920&q=80",
         functions: [
-            { id: "perimeter", name: "Sentry Perimeter & Intrusion Defense", icon: "🚨", desc: "Tripwire border breach, infrared motion, and unauthorized intruder interception." },
-            { id: "weapon", name: "Weapon & Tactical Threat Intercept", icon: "⚔️", desc: "Real-time recognition of firearms, edged weapons, and suspicious payloads." },
-            { id: "clearance", name: "Authorized Personnel Biometrics", icon: "🎖️", desc: "Security clearance verification (Tier 1–4) with facial biometrics." },
-            { id: "alertness", name: "Guard Alertness & Watch Monitoring", icon: "👁️", desc: "Detects sleeping on watch, abandoned sentry posts, and perimeter lapses." },
-            { id: "dossier", name: "Personnel Security Dossier", icon: "📁", desc: "Mission clearance, access history, and violation dossiers maintained 24/7." },
+            { name: "Sentry Perimeter & Intrusion", icon: "🚨", desc: "Tripwire border breaches, optical tripwires, and unauthorized intruder detection." },
+            { name: "Tactical Threat & Weapon Intercept", icon: "⚔️", desc: "Real-time recognition of firearms, blades, and suspicious payloads." },
+            { name: "Authorized Personnel Biometrics", icon: "🪪", desc: "Security clearance verification and biometric facial credential auditing." },
+            { name: "Guard Alertness Watch", icon: "👁️", desc: "Detects sleeping on watch, abandoned sentry stations, and perimeter lapses." },
         ],
     },
-    Industry: {
-        title: "🏭 Heavy Industry, Chemical & Plant Safety",
-        tagline: "OSHA Safety Compliance • Hazard Mitigation • Restricted Machinery Zones",
-        themeClass: "mode-industry",
-        bgImg: "https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=1920&q=80",
-        functions: [
-            { id: "ppe", name: "OSHA & PPE Safety Gear Compliance", icon: "🦺", desc: "Verifies mandatory hardhats, high-visibility vests, safety goggles, and masks." },
-            { id: "hazard", name: "Fire, Smoke & Chemical Hazard Warning", icon: "🔥", desc: "Deep optical smoke and flame detection with instant safety klaxon dispatch." },
-            { id: "machinery", name: "Restricted Machinery Safety Zone", icon: "⚙️", desc: "Tripwires around robotic cells, conveyor pinch points, and boiler units." },
-            { id: "worker_att", name: "Shift Clock-in & Labor Biometrics", icon: "⏱️", desc: "Exact biometric shift tracking and overtime timestamping." },
-            { id: "dossier", name: "Plant Worker Safety Dossier", icon: "📁", desc: "Safety audit compliance, violation flags, and worker cert records." },
-        ],
-    },
-    Hospital: {
-        title: "🏥 Public Places, Transit & Healthcare Hub",
-        tagline: "Civic Surveillance • Crowd Density • Public Safety & Transit Thoroughfares",
+    {
+        type: "Hospital",
+        title: "Public Places & Government Mode",
+        tagline: "Civic Surveillance • Crowd Density • Transit Thoroughfares",
+        icon: "🏛️",
         themeClass: "mode-public",
         bgImg: "https://images.unsplash.com/photo-1519501025264-65ba15a82390?w=1920&q=80",
         functions: [
-            { id: "crowd", name: "Crowd Density & Stampede Warning", icon: "👥", desc: "Monitors concourse density, detects bottleneck panics and stampedes." },
-            { id: "abandoned", name: "Abandoned Object & Bag Detection", icon: "🧳", desc: "Detects stationary unattended luggage or packages in public thoroughfares." },
-            { id: "violence", name: "Public Violence & Altercation Triage", icon: "⚠️", desc: "Recognizes physical fighting, sudden falls, and distress gestures." },
-            { id: "authorized", name: "Restricted Ward & Pharmacy Vault Access", icon: "🔒", desc: "Biometric access gates to operating theaters, narcotics, and neonatal ICU." },
-            { id: "dossier", name: "Staff & Responders Dossier", icon: "📁", desc: "Access badges, biometric check-ins, and shift records." },
+            { name: "Crowd Density & Stampede Warning", icon: "👥", desc: "Monitors concourse density, detects bottleneck panics and stampede risks." },
+            { name: "Abandoned Object & Bag Detection", icon: "🧳", desc: "Detects stationary unattended bags and luggage in civic corridors." },
+            { name: "Public Violence & Altercation Triage", icon: "⚠️", desc: "Recognizes physical fighting, sudden falls, and distress gestures." },
+            { name: "Restricted Vault & Pharmacy Access", icon: "🔒", desc: "Biometric access gates to restricted vaults, archives, and high-security rooms." },
         ],
     },
-    Corporate: {
-        title: "🌐 Corporate Campus & Enterprise Hub",
-        tagline: "Enterprise Security • Executive Turnstiles • Server Room Biometrics",
-        themeClass: "mode-campus",
-        bgImg: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=1920&q=80",
+    {
+        type: "Industry",
+        title: "Office & Industries Mode",
+        tagline: "OSHA Safety Compliance • Hazard Mitigation • Machinery Zones",
+        icon: "🏭",
+        themeClass: "mode-industry",
+        bgImg: "https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=1920&q=80",
         functions: [
-            { id: "executive_att", name: "Executive Face Attendance", icon: "🏢", desc: "Touchless turnstile check-in with millisecond biometric matching." },
-            { id: "tailgating", name: "Anti-Tailgating & Badge Piggybacking", icon: "🚫", desc: "Detects unauthorized individuals following behind an authorized badge scan." },
-            { id: "server_room", name: "High-Security Data Center Access", icon: "🖥️", desc: "Biometric dual-factor authentication for mission-critical IT infrastructure." },
-            { id: "visitor", name: "Visitor Pass & Escort Tracking", icon: "🪪", desc: "Monitors guest roaming and flags unescorted entry to private executive suites." },
-            { id: "dossier", name: "Employee Enterprise Dossier", icon: "📁", desc: "Full personnel dossier with attendance, dress code, and access history." },
+            { name: "OSHA & PPE Safety Gear Compliance", icon: "🦺", desc: "Verifies mandatory hardhats/helmets, high-vis vests, goggles, and gloves before accidents." },
+            { name: "Fire, Smoke & Chemical Hazard Warning", icon: "🔥", desc: "Optical smoke and flame detection with instant safety klaxon dispatch." },
+            { name: "Restricted Machinery Safety Tripwire", icon: "⚙️", desc: "Tripwires around robotic cells, conveyor pinch points, and boiler units." },
+            { name: "Worker Shift Clock-in Biometrics", icon: "⏱️", desc: "Touchless biometric shift tracking and overtime timestamping." },
         ],
     },
-};
+];
 
 export default function EnvironmentSelectPage({ user, onEnvironmentSelected }) {
     const [environments, setEnvironments] = useState([]);
     const [selectedEnv, setSelectedEnv] = useState(null);
-    const [showCreateModal, setShowCreateModal] = useState(false);
+    const [hoveredMode, setHoveredMode] = useState(null);
     const [showOnboardingModal, setShowOnboardingModal] = useState(false);
     const [editingEnv, setEditingEnv] = useState(null);
-
-    // Create environment form
-    const [newName, setNewName] = useState("");
-    const [newType, setNewType] = useState("School");
-    const [newDesc, setNewDesc] = useState("");
-
-    // Edit / Rename environment form
     const [editName, setEditName] = useState("");
-    const [editType, setEditType] = useState("");
     const [feedback, setFeedback] = useState("");
 
     const loadEnvironments = async () => {
@@ -92,15 +75,8 @@ export default function EnvironmentSelectPage({ user, onEnvironmentSelected }) {
             const res = await getEnvironments();
             const list = res.environments || [];
             setEnvironments(list);
-            if (list.length > 0) {
-                const first = list[0];
-                setSelectedEnv((prev) => {
-                    if (prev) {
-                        const found = list.find((e) => e.id === prev.id);
-                        return found || first;
-                    }
-                    return first;
-                });
+            if (list.length > 0 && !selectedEnv) {
+                setSelectedEnv(list[0]);
             }
         } catch (err) {
             console.error("Failed to load environments", err);
@@ -119,7 +95,6 @@ export default function EnvironmentSelectPage({ user, onEnvironmentSelected }) {
         e.stopPropagation();
         setEditingEnv(env);
         setEditName(env.name || "");
-        setEditType(env.type || "School");
     };
 
     const handleSaveEnvRename = async (e) => {
@@ -128,7 +103,7 @@ export default function EnvironmentSelectPage({ user, onEnvironmentSelected }) {
         try {
             const res = await updateEnvironment(editingEnv.id, {
                 name: editName,
-                type: editType,
+                type: editingEnv.type,
             });
             if (res.success) {
                 setEditingEnv(null);
@@ -148,37 +123,15 @@ export default function EnvironmentSelectPage({ user, onEnvironmentSelected }) {
         onEnvironmentSelected(env);
     };
 
-    const handleCreateNew = async (e) => {
-        e.preventDefault();
-        try {
-            const res = await createEnvironment({
-                name: newName,
-                type: newType,
-                description: newDesc,
-                enabled_features: ["face_detection", "attendance", "dress_code", "alerts"],
-            });
-            if (res.success) {
-                setShowCreateModal(false);
-                setNewName("");
-                setNewDesc("");
-                setFeedback(`✓ Created new mode "${newName}"!`);
-                setTimeout(() => setFeedback(""), 4000);
-                await loadEnvironments();
-            }
-        } catch (err) {
-            alert(err.response?.data?.detail || "Failed to create environment");
-        }
-    };
-
-    const currentCap = selectedEnv ? (MODE_CAPABILITIES[selectedEnv.type] || MODE_CAPABILITIES.School) : MODE_CAPABILITIES.School;
+    const activeModeMeta = FOUR_MODES.find((m) => m.type === selectedEnv?.type) || FOUR_MODES[0];
+    const previewModeMeta = hoveredMode ? (FOUR_MODES.find((m) => m.type === hoveredMode.type) || activeModeMeta) : activeModeMeta;
 
     return (
         <div
-            className="env-select-container"
             style={{
                 minHeight: "100vh",
                 padding: "36px 20px",
-                backgroundImage: `linear-gradient(180deg, rgba(10, 15, 24, 0.88) 0%, rgba(10, 15, 24, 0.96) 100%), url(${currentCap.bgImg})`,
+                backgroundImage: `linear-gradient(180deg, rgba(10, 15, 24, 0.90) 0%, rgba(10, 15, 24, 0.98) 100%), url(${previewModeMeta.bgImg})`,
                 backgroundSize: "cover",
                 backgroundPosition: "center",
                 display: "flex",
@@ -187,118 +140,101 @@ export default function EnvironmentSelectPage({ user, onEnvironmentSelected }) {
             }}
         >
             <div
-                className="env-select-card"
                 style={{
-                    maxWidth: "1200px",
                     width: "100%",
-                    padding: "36px",
-                    borderRadius: "14px",
-                    border: "1px solid rgba(212, 175, 55, 0.25)",
-                    background: "rgba(14, 20, 31, 0.94)",
-                    backdropFilter: "blur(20px)",
-                    boxShadow: "0 20px 50px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.08)",
+                    maxWidth: "1080px",
+                    background: "#0d1420",
+                    border: "1px solid rgba(212, 175, 55, 0.35)",
+                    borderRadius: "12px",
+                    padding: "32px",
+                    boxShadow: "0 16px 48px rgba(0,0,0,0.7)",
                 }}
             >
-                {/* Executive Brand Header */}
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "26px", borderBottom: "1px solid rgba(255, 255, 255, 0.08)", paddingBottom: "20px" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-                        <div
-                            style={{
-                                width: "50px",
-                                height: "50px",
-                                borderRadius: "50%",
-                                background: "linear-gradient(135deg, #d4af37 0%, #b8860b 100%)",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                boxShadow: "0 0 20px rgba(212, 175, 55, 0.4)",
-                                color: "#0c1017",
-                                fontSize: "22px",
-                                fontWeight: 800,
-                            }}
-                        >
-                            ⚜️
+                {/* Header */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px", borderBottom: "1px solid rgba(255, 255, 255, 0.08)", paddingBottom: "18px" }}>
+                    <div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                            <span style={{ fontSize: "24px" }}>🛡️</span>
+                            <h2 style={{ margin: 0, fontSize: "22px", fontWeight: 700, color: "#ffffff", letterSpacing: "0.5px" }}>
+                                SENTRONIX SURVEILLANCE MODES
+                            </h2>
                         </div>
-                        <div>
-                            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                                <h2 style={{ margin: 0, fontSize: "22px", fontWeight: 800, color: "#f8fafc", letterSpacing: "0.5px" }}>
-                                    Operational Deployment Mode
-                                </h2>
-                                <span style={{ fontSize: "10px", background: "rgba(212, 175, 55, 0.2)", color: "#d4af37", border: "1px solid rgba(212, 175, 55, 0.4)", padding: "2px 8px", borderRadius: "10px", fontWeight: 700 }}>
-                                    ENTERPRISE 3.0
-                                </span>
-                            </div>
-                            <p style={{ margin: "4px 0 0 0", fontSize: "13px", color: "#94a3b8" }}>
-                                Welcome, <strong>{user?.name || user?.full_name || user?.username}</strong>. Select your domain to configure datasets and cameras.
-                            </p>
-                        </div>
+                        <p style={{ margin: "4px 0 0 0", fontSize: "12px", color: "#94a3b8" }}>
+                            Select your operational domain. Place your cursor on any mode to inspect its core detection functions. Managed by <strong style={{ color: "#d4af37" }}>VANTEP AI</strong>.
+                        </p>
                     </div>
 
-                    <button
-                        type="button"
-                        onClick={() => setShowCreateModal(true)}
-                        className="tool-btn btn-secondary-mini"
-                        style={{ border: "1px solid rgba(255,255,255,0.15)", background: "rgba(255,255,255,0.05)", color: "#cbd5e1", padding: "8px 16px", fontSize: "12px", fontWeight: 600 }}
-                    >
-                        + Create Custom Domain
-                    </button>
+                    <div style={{ fontSize: "12px", color: "#cbd5e1" }}>
+                        Operator: <strong style={{ color: "#d4af37" }}>{user?.full_name || user?.username || "Commander"}</strong>
+                    </div>
                 </div>
 
-                {feedback && <div className="checkin-feedback-banner" style={{ marginBottom: "18px" }}>{feedback}</div>}
+                {feedback && (
+                    <div style={{ background: "rgba(16, 185, 129, 0.15)", border: "1px solid #10b981", color: "#10b981", padding: "10px 14px", borderRadius: "6px", marginBottom: "18px", fontSize: "12px", fontWeight: 600 }}>
+                        {feedback}
+                    </div>
+                )}
 
-                {/* Section 1: Modes Grid */}
+                {/* 4 Main Modes Grid */}
                 <div style={{ marginBottom: "26px" }}>
-                    <div style={{ fontSize: "12px", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "12px" }}>
-                        1. Select Surveillance Domain
+                    <div style={{ fontSize: "11px", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: "12px" }}>
+                        Select Operational Mode (Hover to Inspect Core Capabilities)
                     </div>
 
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: "14px" }}>
-                        {environments.map((env) => {
-                            const isSelected = selectedEnv?.id === env.id;
-                            const cap = MODE_CAPABILITIES[env.type] || MODE_CAPABILITIES.School;
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "14px" }}>
+                        {FOUR_MODES.map((mode) => {
+                            const matchedEnv = environments.find((e) => e.type === mode.type) || { id: 1, name: mode.title, type: mode.type };
+                            const isSelected = selectedEnv?.type === mode.type;
+                            const isHovered = hoveredMode?.type === mode.type;
+
                             return (
                                 <div
-                                    key={env.id}
-                                    onClick={() => handleSelectEnv(env)}
+                                    key={mode.type}
+                                    onClick={() => handleSelectEnv(matchedEnv)}
+                                    onMouseEnter={() => setHoveredMode(matchedEnv)}
+                                    onMouseLeave={() => setHoveredMode(null)}
                                     style={{
-                                        padding: "16px",
+                                        padding: "18px",
                                         borderRadius: "10px",
-                                        border: isSelected ? "2px solid #d4af37" : "1px solid rgba(255, 255, 255, 0.08)",
-                                        background: isSelected ? "rgba(212, 175, 55, 0.12)" : "rgba(255, 255, 255, 0.02)",
+                                        border: isSelected ? "2px solid #d4af37" : (isHovered ? "1px solid #cbd5e1" : "1px solid rgba(255, 255, 255, 0.10)"),
+                                        background: isSelected ? "rgba(212, 175, 55, 0.14)" : (isHovered ? "rgba(255, 255, 255, 0.05)" : "rgba(255, 255, 255, 0.02)"),
                                         cursor: "pointer",
                                         transition: "all 0.15s ease",
                                         display: "flex",
                                         flexDirection: "column",
                                         justifyContent: "space-between",
-                                        minHeight: "125px",
-                                        boxShadow: isSelected ? "0 4px 20px rgba(212, 175, 55, 0.15)" : "none",
+                                        minHeight: "140px",
+                                        boxShadow: isSelected ? "2px 2px 0px rgba(212, 175, 55, 0.3)" : "none",
                                     }}
                                 >
                                     <div>
                                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                                            <span style={{ fontSize: "24px" }}>
-                                                {env.type === "School" ? "🏛️" : (env.type === "Military" ? "🛡️" : (env.type === "Industry" ? "🏭" : "🏥"))}
-                                            </span>
+                                            <span style={{ fontSize: "28px" }}>{mode.icon}</span>
                                             <button
                                                 type="button"
-                                                onClick={(e) => handleOpenEdit(e, env)}
+                                                onClick={(e) => handleOpenEdit(e, matchedEnv)}
                                                 style={{ background: "transparent", border: "none", fontSize: "11px", cursor: "pointer", color: "#94a3b8" }}
                                                 title="Rename mode"
                                             >
                                                 ✏️ Rename
                                             </button>
                                         </div>
-                                        <div style={{ fontSize: "14px", fontWeight: 700, marginTop: "8px", color: "#f8fafc" }}>
-                                            {env.name}
+
+                                        <div style={{ fontSize: "15px", fontWeight: 700, marginTop: "10px", color: isSelected ? "#d4af37" : "#ffffff" }}>
+                                            {matchedEnv.name || mode.title}
+                                        </div>
+                                        <div style={{ fontSize: "11px", color: "#94a3b8", marginTop: "4px" }}>
+                                            {mode.tagline}
                                         </div>
                                     </div>
-                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "10px" }}>
-                                        <span style={{ fontSize: "10px", color: isSelected ? "#d4af37" : "#94a3b8", fontWeight: 700, textTransform: "uppercase" }}>
-                                            {env.type}
+
+                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "12px", borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: "8px" }}>
+                                        <span style={{ fontSize: "10px", color: isSelected ? "#d4af37" : "#64748b", fontWeight: 700, textTransform: "uppercase" }}>
+                                            {mode.type} MODE
                                         </span>
                                         {isSelected && (
                                             <span style={{ fontSize: "10px", color: "#d4af37", fontWeight: 800 }}>
-                                                ● ACTIVE
+                                                ● ACTIVE SELECTION
                                             </span>
                                         )}
                                     </div>
@@ -308,154 +244,113 @@ export default function EnvironmentSelectPage({ user, onEnvironmentSelected }) {
                     </div>
                 </div>
 
-                {/* Section 2: Mode-Specific Capabilities Showcase */}
-                {selectedEnv && (
-                    <div style={{ padding: "20px 24px", borderRadius: "10px", background: "rgba(0, 0, 0, 0.35)", border: "1px solid rgba(255, 255, 255, 0.08)", marginBottom: "26px" }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
-                            <div>
-                                <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 700, color: "#f8fafc" }}>
-                                    {currentCap.title}
+                {/* Interactive Mode Capabilities Showcase on Cursor Hover / Selection */}
+                <div style={{ padding: "20px 24px", borderRadius: "10px", background: "rgba(0, 0, 0, 0.45)", border: "1px solid rgba(255, 255, 255, 0.10)", marginBottom: "26px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+                        <div>
+                            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                <span style={{ fontSize: "20px" }}>{previewModeMeta.icon}</span>
+                                <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 700, color: "#ffffff" }}>
+                                    {previewModeMeta.title} — Core Detection Capabilities
                                 </h3>
-                                <p style={{ margin: "2px 0 0 0", fontSize: "12px", color: "#94a3b8" }}>
-                                    {currentCap.tagline}
-                                </p>
                             </div>
-                            <span style={{ fontSize: "10px", background: "rgba(212, 175, 55, 0.2)", color: "#d4af37", border: "1px solid rgba(212, 175, 55, 0.4)", padding: "3px 10px", borderRadius: "8px", fontWeight: 700 }}>
-                                {currentCap.functions.length} AI SPECIALIZED FUNCTIONS
-                            </span>
+                            <p style={{ margin: "2px 0 0 0", fontSize: "12px", color: "#94a3b8" }}>
+                                {previewModeMeta.tagline}
+                            </p>
                         </div>
-
-                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "10px" }}>
-                            {currentCap.functions.map((fn) => (
-                                <div
-                                    key={fn.id}
-                                    style={{
-                                        padding: "12px 14px",
-                                        background: "rgba(255, 255, 255, 0.03)",
-                                        borderRadius: "8px",
-                                        border: "1px solid rgba(255, 255, 255, 0.06)",
-                                        display: "flex",
-                                        alignItems: "flex-start",
-                                        gap: "10px",
-                                    }}
-                                >
-                                    <span style={{ fontSize: "20px" }}>{fn.icon}</span>
-                                    <div>
-                                        <div style={{ fontSize: "12px", fontWeight: 700, color: "#f8fafc" }}>{fn.name}</div>
-                                        <div style={{ fontSize: "11px", color: "#94a3b8", marginTop: "2px" }}>{fn.desc}</div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
+                        <span style={{ fontSize: "11px", color: "#d4af37", fontWeight: 700, background: "rgba(212, 175, 55, 0.12)", padding: "4px 10px", borderRadius: "4px" }}>
+                            VANTEP AI AUTO-TRIAGE
+                        </span>
                     </div>
-                )}
 
-                {/* Section 3: Action Controls */}
-                <div style={{ display: "flex", justifyContent: "flex-end", gap: "14px", borderTop: "1px solid rgba(255, 255, 255, 0.08)", paddingTop: "20px" }}>
-                    <button
-                        type="button"
-                        onClick={() => handleDirectEnter()}
-                        className="tool-btn btn-secondary-mini"
-                        style={{ padding: "10px 22px", fontSize: "13px", color: "#cbd5e1", border: "1px solid rgba(255,255,255,0.15)", background: "rgba(255,255,255,0.04)" }}
-                    >
-                        ⚡ Direct Command Center
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => setShowOnboardingModal(true)}
-                        style={{
-                            padding: "10px 28px",
-                            fontSize: "13px",
-                            fontWeight: 700,
-                            background: "linear-gradient(135deg, #d4af37 0%, #b8860b 100%)",
-                            color: "#0c1017",
-                            border: "none",
-                            borderRadius: "6px",
-                            cursor: "pointer",
-                            boxShadow: "0 4px 16px rgba(212, 175, 55, 0.35)",
-                        }}
-                    >
-                        🚀 Initialize Mode &amp; Dataset (Guided Setup)
-                    </button>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "12px" }}>
+                        {previewModeMeta.functions.map((fn, idx) => (
+                            <div key={idx} style={{ padding: "12px 14px", borderRadius: "8px", background: "rgba(255, 255, 255, 0.03)", border: "1px solid rgba(255, 255, 255, 0.06)" }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "4px" }}>
+                                    <span>{fn.icon}</span>
+                                    <span style={{ fontSize: "12px", fontWeight: 700, color: "#f8fafc" }}>{fn.name}</span>
+                                </div>
+                                <div style={{ fontSize: "11px", color: "#94a3b8", lineHeight: "1.4" }}>{fn.desc}</div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Action Launch Bar */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: "20px" }}>
+                    <div style={{ fontSize: "12px", color: "#94a3b8" }}>
+                        Selected: <strong style={{ color: "#d4af37" }}>{selectedEnv?.name || "Campus Mode"}</strong>
+                    </div>
+
+                    <div style={{ display: "flex", gap: "12px" }}>
+                        <button
+                            type="button"
+                            onClick={() => setShowOnboardingModal(true)}
+                            style={{
+                                background: "rgba(212, 175, 55, 0.15)",
+                                border: "1px solid #d4af37",
+                                color: "#d4af37",
+                                padding: "10px 18px",
+                                borderRadius: "6px",
+                                fontSize: "13px",
+                                fontWeight: 700,
+                                cursor: "pointer",
+                            }}
+                        >
+                            ⚙️ Setup Dataset &amp; Camera Wizard
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={() => handleDirectEnter()}
+                            style={{
+                                background: "#d4af37",
+                                color: "#000000",
+                                border: "none",
+                                padding: "10px 24px",
+                                borderRadius: "6px",
+                                fontSize: "13px",
+                                fontWeight: 800,
+                                cursor: "pointer",
+                                boxShadow: "0 4px 16px rgba(212, 175, 55, 0.35)",
+                            }}
+                        >
+                            🚀 Launch Operational Dashboard →
+                        </button>
+                    </div>
                 </div>
             </div>
 
-            {/* Step-by-Step Onboarding Wizard Modal */}
-            <OnboardingFlowModal
-                environment={selectedEnv}
-                isOpen={showOnboardingModal}
-                onClose={() => setShowOnboardingModal(false)}
-                onLaunchLive={(config) => handleDirectEnter()}
-            />
-
             {/* Rename Modal */}
             {editingEnv && (
-                <div className="modal-overlay">
-                    <div className="modal-dialog" style={{ background: "#0e131b", border: "1px solid rgba(212, 175, 55, 0.3)" }}>
-                        <div className="modal-header">
-                            <h3 style={{ color: "#f8fafc" }}>✏️ Rename Deployment Mode</h3>
-                            <button className="tool-btn btn-secondary-mini" onClick={() => setEditingEnv(null)}>✕</button>
-                        </div>
-                        <form onSubmit={handleSaveEnvRename} className="modal-form">
-                            <div>
-                                <label style={{ fontSize: "11px", color: "#94a3b8" }}>Mode Name</label>
-                                <input
-                                    className="form-control"
-                                    value={editName}
-                                    onChange={(e) => setEditName(e.target.value)}
-                                    style={{ width: "100%", padding: "8px 12px", fontSize: "13px", background: "#131a26", color: "#ffffff", border: "1px solid rgba(255,255,255,0.1)" }}
-                                />
-                            </div>
-                            <div className="modal-actions">
-                                <button type="button" className="tool-btn btn-secondary-mini" onClick={() => setEditingEnv(null)}>Cancel</button>
-                                <button type="submit" className="tool-btn btn-primary" style={{ background: "#d4af37", color: "#0c1017" }}>Save Changes</button>
+                <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 10001, display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }}>
+                    <div style={{ background: "#0e131b", border: "1px solid #d4af37", borderRadius: "8px", padding: "20px", width: "100%", maxWidth: "400px" }}>
+                        <h3 style={{ margin: "0 0 12px 0", fontSize: "15px", color: "#ffffff" }}>Rename Operational Mode</h3>
+                        <form onSubmit={handleSaveEnvRename}>
+                            <input
+                                type="text"
+                                value={editName}
+                                onChange={(e) => setEditName(e.target.value)}
+                                required
+                                style={{ width: "100%", padding: "8px 10px", borderRadius: "4px", border: "1px solid rgba(255,255,255,0.2)", background: "#151c27", color: "#ffffff", fontSize: "13px", marginBottom: "14px" }}
+                            />
+                            <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
+                                <button type="button" onClick={() => setEditingEnv(null)} style={{ background: "transparent", border: "1px solid rgba(255,255,255,0.2)", padding: "6px 12px", borderRadius: "4px", fontSize: "11px", color: "#cbd5e1" }}>Cancel</button>
+                                <button type="submit" style={{ background: "#d4af37", color: "#000000", padding: "6px 14px", borderRadius: "4px", fontSize: "11px", fontWeight: 700 }}>Save</button>
                             </div>
                         </form>
                     </div>
                 </div>
             )}
 
-            {/* Create Custom Mode Modal */}
-            {showCreateModal && (
-                <div className="modal-overlay">
-                    <div className="modal-dialog" style={{ background: "#0e131b", border: "1px solid rgba(212, 175, 55, 0.3)" }}>
-                        <div className="modal-header">
-                            <h3 style={{ color: "#f8fafc" }}>➕ Add Custom Operational Domain</h3>
-                            <button className="tool-btn btn-secondary-mini" onClick={() => setShowCreateModal(false)}>✕</button>
-                        </div>
-                        <form onSubmit={handleCreateNew} className="modal-form">
-                            <div>
-                                <label style={{ fontSize: "11px", color: "#94a3b8" }}>Mode Name *</label>
-                                <input
-                                    className="form-control"
-                                    value={newName}
-                                    onChange={(e) => setNewName(e.target.value)}
-                                    placeholder="e.g. Apex Strategic Compound"
-                                    required
-                                    style={{ width: "100%", padding: "8px 12px", fontSize: "13px", background: "#131a26", color: "#ffffff", border: "1px solid rgba(255,255,255,0.1)" }}
-                                />
-                            </div>
-                            <div>
-                                <label style={{ fontSize: "11px", color: "#94a3b8" }}>Domain Category</label>
-                                <select
-                                    value={newType}
-                                    onChange={(e) => setNewType(e.target.value)}
-                                    style={{ width: "100%", padding: "8px 12px", fontSize: "13px", background: "#131a26", color: "#ffffff", border: "1px solid rgba(255,255,255,0.1)" }}
-                                >
-                                    <option value="School">School / Campus</option>
-                                    <option value="Military">Military / Defense</option>
-                                    <option value="Industry">Industry &amp; Manufacturing</option>
-                                    <option value="Hospital">Hospital / Public Places</option>
-                                    <option value="Corporate">Corporate Tech Hub</option>
-                                </select>
-                            </div>
-                            <div className="modal-actions">
-                                <button type="button" className="tool-btn btn-secondary-mini" onClick={() => setShowCreateModal(false)}>Cancel</button>
-                                <button type="submit" className="tool-btn btn-primary" style={{ background: "#d4af37", color: "#0c1017" }}>Create Mode</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
+            {/* Setup Wizard */}
+            {showOnboardingModal && (
+                <OnboardingFlowModal
+                    environment={selectedEnv}
+                    isOpen={showOnboardingModal}
+                    onClose={() => setShowOnboardingModal(false)}
+                    onLaunchLive={() => handleDirectEnter()}
+                />
             )}
         </div>
     );

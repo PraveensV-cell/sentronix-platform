@@ -1,7 +1,6 @@
 import os
 import cv2
 import time
-import math
 import sqlite3
 import numpy as np
 from datetime import datetime, date
@@ -465,67 +464,47 @@ def process_frame(
 def generate_synthetic_frame(
     frame_num: int, camera_name: str = "Entrance Cam 01", camera_id: int = 1
 ) -> np.ndarray:
-    """Generates an animated surveillance stream when no hardware webcam is connected."""
+    """Generates a clean standby test pattern when no hardware camera or mobile stream is active."""
     w, h = 640, 480
     frame = np.zeros((h, w, 3), dtype=np.uint8)
-    frame[:] = (248, 250, 252)  # Light clean background
+    frame[:] = (248, 250, 252)  # Light clean 2D background
 
     # Subtle 2D grid
     for y in range(0, h, 40):
-        cv2.line(frame, (0, y), (w, y), (226, 232, 240), 1)
+        cv2.line(frame, (0, y), (w, y), (230, 235, 242), 1)
     for x in range(0, w, 40):
-        cv2.line(frame, (x, 0), (x, h), (226, 232, 240), 1)
+        cv2.line(frame, (x, 0), (x, h), (230, 235, 242), 1)
 
-    t = frame_num * 0.05
-    cx = int(w / 2 + 110 * math.cos(t))
-    cy = int(h / 2 + 50 * math.sin(t))
+    # Clean 2D Crosshair & Center Standby Target
+    cx, cy = w // 2, h // 2
+    cv2.circle(frame, (cx, cy), 54, (203, 213, 225), 1, cv2.LINE_AA)
+    cv2.circle(frame, (cx, cy), 4, (180, 83, 9), -1)
+    cv2.line(frame, (cx - 70, cy), (cx - 15, cy), (203, 213, 225), 1)
+    cv2.line(frame, (cx + 15, cy), (cx + 70, cy), (203, 213, 225), 1)
+    cv2.line(frame, (cx, cy - 70), (cx, cy - 15), (203, 213, 225), 1)
+    cv2.line(frame, (cx, cy + 15), (cx, cy + 70), (203, 213, 225), 1)
 
-    # Clean 2D person silhouette
-    cv2.rectangle(frame, (cx - 36, cy - 72), (cx + 36, cy + 72), (60, 230, 110), 2)
-    cv2.rectangle(frame, (cx - 36, cy - 92), (cx + 65, cy - 72), (60, 230, 110), -1)
-    cv2.putText(
-        frame,
-        "person 92%",
-        (cx - 32, cy - 77),
-        cv2.FONT_HERSHEY_SIMPLEX,
-        0.42,
-        (15, 23, 42),
-        1,
-        cv2.LINE_AA,
-    )
+    # 2D Corner Accents
+    corner_len = 22
+    for px, py, dx, dy in [
+        (24, 44, 1, 1),
+        (w - 24, 44, -1, 1),
+        (24, h - 24, 1, -1),
+        (w - 24, h - 24, -1, -1),
+    ]:
+        cv2.line(frame, (px, py), (px + dx * corner_len, py), (180, 83, 9), 2)
+        cv2.line(frame, (px, py), (px, py + dy * corner_len), (180, 83, 9), 2)
 
-    # Face box
-    cv2.rectangle(frame, (cx - 18, cy - 65), (cx + 18, cy - 28), (240, 160, 50), 2)
-    cv2.putText(
-        frame,
-        "STU-101 [Aarav Sharma]",
-        (cx - 45, cy + 92),
-        cv2.FONT_HERSHEY_SIMPLEX,
-        0.42,
-        (15, 23, 42),
-        1,
-        cv2.LINE_AA,
-    )
-    cv2.putText(
-        frame,
-        "FORMAL DRESS: COMPLIANT",
-        (cx - 48, cy + 108),
-        cv2.FONT_HERSHEY_SIMPLEX,
-        0.38,
-        (5, 150, 105),
-        1,
-        cv2.LINE_AA,
-    )
-
+    # Top Status Bar
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     cv2.rectangle(frame, (0, 0), (w, 32), (15, 23, 42), -1)
     cv2.putText(
         frame,
-        f"SENTRONIX AI • {camera_name.upper()} • SIMULATION ACTIVE",
+        f"SENTRONIX VANTEP AI • {camera_name.upper()} • SENSOR STANDBY",
         (12, 21),
         cv2.FONT_HERSHEY_SIMPLEX,
-        0.48,
-        (56, 189, 248),
+        0.44,
+        (212, 175, 55),
         1,
         cv2.LINE_AA,
     )
@@ -534,8 +513,30 @@ def generate_synthetic_frame(
         now_str,
         (w - 175, 21),
         cv2.FONT_HERSHEY_SIMPLEX,
-        0.44,
+        0.42,
         (203, 213, 225),
+        1,
+        cv2.LINE_AA,
+    )
+
+    # Center Standby Prompt
+    cv2.putText(
+        frame,
+        "OPTICS NOMINAL • WAITING FOR CAMERA FEED",
+        (cx - 165, cy + 85),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.46,
+        (71, 85, 105),
+        1,
+        cv2.LINE_AA,
+    )
+    cv2.putText(
+        frame,
+        "Connect Webcam, USB Camera, or Mobile Stream via Dashboard",
+        (cx - 195, cy + 106),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.38,
+        (148, 163, 184),
         1,
         cv2.LINE_AA,
     )

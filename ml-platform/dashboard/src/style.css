@@ -2,56 +2,266 @@
     box-sizing: border-box;
 }
 
-/* ── Light Mode Root Theme (White, Gold & Ruby Red) ─────────────────────── */
+/* ============================================================================
+   SENTRONIX 2D LIGHT & DARK THEMES (NO GLASS, NO 3D CANVAS, CLEAN 2D DEPTH)
+   ============================================================================ */
+
+/* ── Default Light Mode ─────────────────────────────────────────────────── */
 :root,
 [data-theme="light"],
 .theme-light {
     --bg-main: #f8fafc;
     --bg-secondary: #f1f5f9;
-    --bg-panel: rgba(255, 255, 255, 0.96);
-    --card-bg: rgba(255, 255, 255, 0.96);
-    --border-color: rgba(0, 0, 0, 0.08);
-    --border-silver: rgba(0, 0, 0, 0.06);
-    --text-primary: #0f172a;
+    --bg-panel: #ffffff;
+    --card-bg: #ffffff;
+    --border-color: #e2e8f0;
+    --border-silver: #cbd5e1;
+    --text-primary: #0a0a0a;
     --text-secondary: #334155;
     --text-muted: #64748b;
     --primary-color: #b45309;
-    --primary-soft: rgba(212, 175, 55, 0.12);
+    --primary-soft: rgba(180, 83, 9, 0.10);
     --success-color: #10b981;
     --danger-color: #dc2626;
     --accent-red: #dc2626;
     --ruby-red: #b91c1c;
     --warning-color: #f59e0b;
-    --royal-gold: #d4af37;
+    --royal-gold: #c59b27;
     --royal-silver: #64748b;
-    --card-shadow: 0 4px 18px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.04);
+    --card-shadow: 2px 2px 0px rgba(0, 0, 0, 0.08), 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
-/* ── Dark Mode Root Theme (Black, Silver, Gold & Selective Glass) ───────── */
+/* ── Default Dark Mode ──────────────────────────────────────────────────── */
 [data-theme="dark"],
 .theme-dark {
-    --bg-main: #06090e;
-    --bg-secondary: #0d121a;
-    --bg-panel: rgba(13, 18, 27, 0.92);
-    --card-bg: #0d121a;
-    --border-color: rgba(212, 175, 55, 0.22);
-    --border-silver: rgba(203, 213, 225, 0.12);
-    --text-primary: #f8fafc;
+    --bg-main: #070d18;
+    --bg-secondary: #0d1626;
+    --bg-panel: #0d1626;
+    --card-bg: #0d1626;
+    --border-color: rgba(212, 175, 55, 0.30);
+    --border-silver: rgba(203, 213, 225, 0.20);
+    --text-primary: #ffffff;
     --text-secondary: #cbd5e1;
     --text-muted: #94a3b8;
-    --primary-color: #d4af37;
-    --primary-soft: rgba(212, 175, 55, 0.14);
+    --primary-color: #ffd700;
+    --primary-soft: rgba(255, 215, 0, 0.12);
     --success-color: #10b981;
     --danger-color: #ef4444;
     --accent-red: #ef4444;
     --ruby-red: #dc2626;
     --warning-color: #f59e0b;
-    --royal-gold: #d4af37;
+    --royal-gold: #e5c07b;
     --royal-silver: #cbd5e1;
-    --card-shadow: 0 4px 20px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    --card-shadow: 2px 2px 0px rgba(212, 175, 55, 0.18), 0 4px 14px rgba(0, 0, 0, 0.6);
 }
 
-/* Typographic Font Classes */
+/* ============================================================================
+   MODE 1: CAMPUS / SCHOOL MODE
+   Light: White, Gold, Red base with Black font
+   Dark:  Blue, Gold, Silver base with White font
+   ============================================================================ */
+[data-theme="light"] .mode-campus,
+.theme-light .mode-campus,
+.mode-campus[data-theme="light"],
+[data-theme="light"][data-mode="School"] {
+    --bg-main: #fbfbf9;
+    --bg-secondary: #f4efe6;
+    --bg-panel: #ffffff;
+    --card-bg: #ffffff;
+    --border-color: rgba(197, 155, 39, 0.32);
+    --border-silver: rgba(220, 38, 38, 0.25);
+    --text-primary: #0a0a0a;
+    --text-secondary: #1e293b;
+    --text-muted: #475569;
+    --primary-color: #b45309;
+    --accent-red: #dc2626;
+    --royal-gold: #c59b27;
+    --card-shadow: 2px 2px 0px rgba(197, 155, 39, 0.22), 0 2px 8px rgba(0, 0, 0, 0.05);
+    background-image: linear-gradient(180deg, rgba(251, 251, 249, 0.94) 0%, rgba(251, 251, 249, 0.98) 100%),
+        url('https://images.unsplash.com/photo-1562774053-701939374585?w=1920&q=80');
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+}
+
+[data-theme="dark"] .mode-campus,
+.theme-dark .mode-campus,
+.mode-campus[data-theme="dark"],
+[data-theme="dark"][data-mode="School"] {
+    --bg-main: #070f1e;
+    --bg-secondary: #0d1b32;
+    --bg-panel: #0d1b32;
+    --card-bg: #0d1b32;
+    --border-color: rgba(255, 215, 0, 0.32);
+    --border-silver: rgba(203, 213, 225, 0.22);
+    --text-primary: #ffffff;
+    --text-secondary: #e2e8f0;
+    --text-muted: #94a3b8;
+    --primary-color: #ffd700;
+    --royal-gold: #ffd700;
+    --royal-silver: #cbd5e1;
+    --card-shadow: 2px 2px 0px rgba(255, 215, 0, 0.18), 0 4px 14px rgba(0, 0, 0, 0.65);
+    background-image: linear-gradient(180deg, rgba(7, 15, 30, 0.94) 0%, rgba(7, 15, 30, 0.98) 100%),
+        url('https://images.unsplash.com/photo-1541339907198-e08756dedf3f?w=1920&q=80');
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+}
+
+/* ============================================================================
+   MODE 2: PUBLIC PLACES / GOVERNMENT MODE
+   Light: White, Brown, Orange base with Black font
+   Dark:  Charcoal, Gold base with White font
+   ============================================================================ */
+[data-theme="light"] .mode-public,
+.theme-light .mode-public,
+.mode-public[data-theme="light"],
+[data-theme="light"][data-mode="Hospital"] {
+    --bg-main: #faf7f2;
+    --bg-secondary: #f2e9de;
+    --bg-panel: #ffffff;
+    --card-bg: #ffffff;
+    --border-color: rgba(120, 53, 15, 0.26);
+    --border-silver: rgba(234, 88, 12, 0.22);
+    --text-primary: #0a0a0a;
+    --text-secondary: #292524;
+    --text-muted: #57534e;
+    --primary-color: #92400e;
+    --accent-orange: #ea580c;
+    --card-shadow: 2px 2px 0px rgba(120, 53, 15, 0.20), 0 2px 8px rgba(0, 0, 0, 0.05);
+    background-image: linear-gradient(180deg, rgba(250, 247, 242, 0.94) 0%, rgba(250, 247, 242, 0.98) 100%),
+        url('https://images.unsplash.com/photo-1530521954074-e64f6810b32d?w=1920&q=80');
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+}
+
+[data-theme="dark"] .mode-public,
+.theme-dark .mode-public,
+.mode-public[data-theme="dark"],
+[data-theme="dark"][data-mode="Hospital"] {
+    --bg-main: #14171a;
+    --bg-secondary: #1d2127;
+    --bg-panel: #1d2127;
+    --card-bg: #1d2127;
+    --border-color: rgba(212, 175, 55, 0.32);
+    --border-silver: rgba(203, 213, 225, 0.20);
+    --text-primary: #ffffff;
+    --text-secondary: #e2e8f0;
+    --text-muted: #94a3b8;
+    --primary-color: #d4af37;
+    --royal-gold: #d4af37;
+    --card-shadow: 2px 2px 0px rgba(212, 175, 55, 0.18), 0 4px 14px rgba(0, 0, 0, 0.65);
+    background-image: linear-gradient(180deg, rgba(20, 23, 26, 0.94) 0%, rgba(20, 23, 26, 0.98) 100%),
+        url('https://images.unsplash.com/photo-1519501025264-65ba15a82390?w=1920&q=80');
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+}
+
+/* ============================================================================
+   MODE 3: MILITARY / DEFENCE MODE
+   Light: White, Light Blue, Navy Green base with Black font
+   Dark:  Navy Blue, Gold, Wood Green base with White font
+   ============================================================================ */
+[data-theme="light"] .mode-military,
+.theme-light .mode-military,
+.mode-military[data-theme="light"],
+[data-theme="light"][data-mode="Military"] {
+    --bg-main: #f2f6fa;
+    --bg-secondary: #e5edf5;
+    --bg-panel: #ffffff;
+    --card-bg: #ffffff;
+    --border-color: rgba(30, 58, 43, 0.28);
+    --border-silver: rgba(2, 132, 199, 0.22);
+    --text-primary: #0a0a0a;
+    --text-secondary: #1e293b;
+    --text-muted: #475569;
+    --primary-color: #0284c7;
+    --navy-green: #1e3a2b;
+    --card-shadow: 2px 2px 0px rgba(30, 58, 43, 0.20), 0 2px 8px rgba(0, 0, 0, 0.05);
+    background-image: linear-gradient(180deg, rgba(242, 246, 250, 0.94) 0%, rgba(242, 246, 250, 0.98) 100%),
+        url('https://images.unsplash.com/photo-1541872703-74c5e44368f9?w=1920&q=80');
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+}
+
+[data-theme="dark"] .mode-military,
+.theme-dark .mode-military,
+.mode-military[data-theme="dark"],
+[data-theme="dark"][data-mode="Military"] {
+    --bg-main: #070d18;
+    --bg-secondary: #0b1526;
+    --bg-panel: #0b1526;
+    --card-bg: #0b1526;
+    --border-color: rgba(197, 160, 89, 0.34);
+    --border-silver: rgba(45, 106, 79, 0.35);
+    --text-primary: #ffffff;
+    --text-secondary: #e2e8f0;
+    --text-muted: #94a3b8;
+    --primary-color: #c5a059;
+    --wood-green: #1b4332;
+    --card-shadow: 2px 2px 0px rgba(197, 160, 89, 0.18), 0 4px 14px rgba(0, 0, 0, 0.7);
+    background-image: linear-gradient(180deg, rgba(7, 13, 24, 0.94) 0%, rgba(7, 13, 24, 0.98) 100%),
+        url('https://images.unsplash.com/photo-1508873696983-2df570464756?w=1920&q=80');
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+}
+
+/* ============================================================================
+   MODE 4: OFFICE & INDUSTRIES MODE
+   Light: Slate White, Steel Blue, Amber base with Black font
+   Dark:  Dark Steel Graphite, Bronze Gold, Cyan base with White font
+   ============================================================================ */
+[data-theme="light"] .mode-industry,
+.theme-light .mode-industry,
+.mode-industry[data-theme="light"],
+[data-theme="light"][data-mode="Industry"] {
+    --bg-main: #f8fafc;
+    --bg-secondary: #edf2f7;
+    --bg-panel: #ffffff;
+    --card-bg: #ffffff;
+    --border-color: rgba(51, 65, 85, 0.24);
+    --border-silver: rgba(217, 119, 6, 0.24);
+    --text-primary: #0a0a0a;
+    --text-secondary: #1e293b;
+    --text-muted: #475569;
+    --primary-color: #b45309;
+    --card-shadow: 2px 2px 0px rgba(51, 65, 85, 0.20), 0 2px 8px rgba(0, 0, 0, 0.05);
+    background-image: linear-gradient(180deg, rgba(248, 250, 252, 0.94) 0%, rgba(248, 250, 252, 0.98) 100%),
+        url('https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=1920&q=80');
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+}
+
+[data-theme="dark"] .mode-industry,
+.theme-dark .mode-industry,
+.mode-industry[data-theme="dark"],
+[data-theme="dark"][data-mode="Industry"] {
+    --bg-main: #0c0f14;
+    --bg-secondary: #141820;
+    --bg-panel: #141820;
+    --card-bg: #141820;
+    --border-color: rgba(245, 158, 11, 0.32);
+    --border-silver: rgba(203, 213, 225, 0.20);
+    --text-primary: #ffffff;
+    --text-secondary: #e2e8f0;
+    --text-muted: #94a3b8;
+    --primary-color: #f59e0b;
+    --card-shadow: 2px 2px 0px rgba(245, 158, 11, 0.18), 0 4px 14px rgba(0, 0, 0, 0.7);
+    background-image: linear-gradient(180deg, rgba(12, 15, 20, 0.94) 0%, rgba(12, 15, 20, 0.98) 100%),
+        url('https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=1920&q=80');
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+}
+
+/* ============================================================================
+   TYPOGRAPHY & GLOBAL 2D ELEMENTS
+   ============================================================================ */
 .font-royal,
 [data-font="royal"] {
     font-family: "Cinzel", "Playfair Display", Georgia, serif !important;
@@ -70,118 +280,6 @@
 .font-mono,
 [data-font="mono"] {
     font-family: "Fira Code", monospace !important;
-}
-
-/* ── Mode-Specific Backgrounds (Light Mode) ─────────────────────────────── */
-[data-theme="light"] .mode-campus,
-.theme-light .mode-campus {
-    background-image: linear-gradient(180deg, rgba(248, 250, 252, 0.90) 0%, rgba(248, 250, 252, 0.96) 100%),
-        url('https://images.unsplash.com/photo-1562774053-701939374585?w=1920&q=80');
-    background-size: cover;
-    background-position: center;
-    background-attachment: fixed;
-    --mode-accent: #dc2626;
-    --mode-border: rgba(220, 38, 38, 0.25);
-}
-
-[data-theme="light"] .mode-military,
-.theme-light .mode-military {
-    background-image: linear-gradient(180deg, rgba(241, 245, 249, 0.90) 0%, rgba(241, 245, 249, 0.96) 100%),
-        url('https://images.unsplash.com/photo-1541872703-74c5e44368f9?w=1920&q=80');
-    background-size: cover;
-    background-position: center;
-    background-attachment: fixed;
-    --mode-accent: #dc2626;
-    --mode-border: rgba(220, 38, 38, 0.25);
-}
-
-[data-theme="light"] .mode-industry,
-.theme-light .mode-industry {
-    background-image: linear-gradient(180deg, rgba(248, 250, 252, 0.90) 0%, rgba(248, 250, 252, 0.96) 100%),
-        url('https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=1920&q=80');
-    background-size: cover;
-    background-position: center;
-    background-attachment: fixed;
-    --mode-accent: #ea580c;
-    --mode-border: rgba(234, 88, 12, 0.25);
-}
-
-[data-theme="light"] .mode-public,
-.theme-light .mode-public {
-    background-image: linear-gradient(180deg, rgba(248, 250, 252, 0.90) 0%, rgba(248, 250, 252, 0.96) 100%),
-        url('https://images.unsplash.com/photo-1530521954074-e64f6810b32d?w=1920&q=80');
-    background-size: cover;
-    background-position: center;
-    background-attachment: fixed;
-    --mode-accent: #dc2626;
-    --mode-border: rgba(220, 38, 38, 0.25);
-}
-
-[data-theme="light"] .mode-corporate,
-.theme-light .mode-corporate {
-    background-image: linear-gradient(180deg, rgba(248, 250, 252, 0.90) 0%, rgba(248, 250, 252, 0.96) 100%),
-        url('https://images.unsplash.com/photo-1497366216548-37526070297c?w=1920&q=80');
-    background-size: cover;
-    background-position: center;
-    background-attachment: fixed;
-    --mode-accent: #dc2626;
-    --mode-border: rgba(220, 38, 38, 0.25);
-}
-
-/* ── Mode-Specific Backgrounds (Dark Mode) ──────────────────────────────── */
-[data-theme="dark"] .mode-campus,
-.theme-dark .mode-campus {
-    background-image: linear-gradient(180deg, rgba(6, 9, 14, 0.93) 0%, rgba(6, 9, 14, 0.98) 100%),
-        url('https://images.unsplash.com/photo-1541339907198-e08756dedf3f?w=1920&q=80');
-    background-size: cover;
-    background-position: center;
-    background-attachment: fixed;
-    --mode-accent: #d4af37;
-    --mode-border: rgba(212, 175, 55, 0.35);
-}
-
-[data-theme="dark"] .mode-military,
-.theme-dark .mode-military {
-    background-image: linear-gradient(180deg, rgba(5, 8, 12, 0.94) 0%, rgba(5, 8, 12, 0.98) 100%),
-        url('https://images.unsplash.com/photo-1508873696983-2df570464756?w=1920&q=80');
-    background-size: cover;
-    background-position: center;
-    background-attachment: fixed;
-    --mode-accent: #cbd5e1;
-    --mode-border: rgba(203, 213, 225, 0.3);
-}
-
-[data-theme="dark"] .mode-industry,
-.theme-dark .mode-industry {
-    background-image: linear-gradient(180deg, rgba(6, 9, 12, 0.93) 0%, rgba(6, 9, 12, 0.98) 100%),
-        url('https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=1920&q=80');
-    background-size: cover;
-    background-position: center;
-    background-attachment: fixed;
-    --mode-accent: #f59e0b;
-    --mode-border: rgba(245, 158, 11, 0.35);
-}
-
-[data-theme="dark"] .mode-public,
-.theme-dark .mode-public {
-    background-image: linear-gradient(180deg, rgba(6, 9, 16, 0.93) 0%, rgba(6, 9, 16, 0.98) 100%),
-        url('https://images.unsplash.com/photo-1519501025264-65ba15a82390?w=1920&q=80');
-    background-size: cover;
-    background-position: center;
-    background-attachment: fixed;
-    --mode-accent: #cbd5e1;
-    --mode-border: rgba(203, 213, 225, 0.3);
-}
-
-[data-theme="dark"] .mode-corporate,
-.theme-dark .mode-corporate {
-    background-image: linear-gradient(180deg, rgba(6, 8, 14, 0.93) 0%, rgba(6, 8, 14, 0.98) 100%),
-        url('https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=1920&q=80');
-    background-size: cover;
-    background-position: center;
-    background-attachment: fixed;
-    --mode-accent: #d4af37;
-    --mode-border: rgba(212, 175, 55, 0.35);
 }
 
 html,
@@ -235,10 +333,10 @@ img {
 }
 
 ::-webkit-scrollbar-thumb {
-    background: rgba(212, 175, 55, 0.3);
+    background: rgba(180, 131, 22, 0.35);
     border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: var(--royal-gold);
+    background: var(--primary-color);
 }

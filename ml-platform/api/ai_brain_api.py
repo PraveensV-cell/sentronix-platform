@@ -1,9 +1,10 @@
-import json
-import time
-import sqlite3
 import datetime
+import json
 from pathlib import Path
-from typing import Dict, Any, Optional, List
+import sqlite3
+import time
+from typing import Any, Dict, List, Optional
+
 from fastapi import APIRouter, Response
 from pydantic import BaseModel
 
@@ -14,12 +15,13 @@ START_TIME = time.time()
 
 router = APIRouter(
     prefix="/ai-brain",
-    tags=["JARVIS AI Main Brain & 24/7 Operations"],
+    tags=["VANTEP AI Main Brain & 24/7 Operations"],
 )
 
-# Global AI Brain State
+# Global VANTEP AI Brain State
 _ai_config = {
-    "name": "JARVIS PRIME",
+    "name": "VANTEP (JARVIS Series AI)",
+    "codename": "JARVIS Class Autonomous Intelligence",
     "speed_mode": "HIGH_PRECISION",  # "TURBO", "BALANCED", "HIGH_PRECISION"
     "autonomy_level": "FULL_AUTONOMOUS",  # "FULL_AUTONOMOUS", "SUPERVISED", "ADVISORY"
     "voice_announcements": True,
@@ -32,8 +34,8 @@ _recent_actions: List[Dict[str, Any]] = [
     {
         "id": 1,
         "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "module": "CORE_SUPERVISOR",
-        "action": "JARVIS 24/7 Neural Surveillance Engine initialized with full autonomous permissions.",
+        "module": "VANTEP_SUPERVISOR",
+        "action": "VANTEP AI 24/7 Neural Surveillance Engine active. Monitoring cameras, attendance, dress code, safety, and violations.",
         "severity": "INFO",
     }
 ]
@@ -71,24 +73,35 @@ def generate_daily_work_log(today_date: Optional[str] = None) -> Dict[str, Any]:
 
     conn = get_db()
     try:
-        # Count today's attendances
         att_count = conn.execute(
             "SELECT COUNT(*) FROM attendance_records WHERE timestamp LIKE ?",
             (f"{today_date}%",),
         ).fetchone()[0]
 
-        # Count today's alerts
         alerts_today = conn.execute(
             "SELECT COUNT(*) FROM alerts WHERE timestamp LIKE ?",
             (f"{today_date}%",),
         ).fetchone()[0]
 
-        # Active cameras
+        dress_violations = conn.execute(
+            "SELECT COUNT(*) FROM alerts WHERE object LIKE '%DRESS CODE VIOLATION%' AND timestamp LIKE ?",
+            (f"{today_date}%",),
+        ).fetchone()[0]
+
+        safety_violations = conn.execute(
+            "SELECT COUNT(*) FROM alerts WHERE object LIKE '%SAFETY HAZARD%' AND timestamp LIKE ?",
+            (f"{today_date}%",),
+        ).fetchone()[0]
+
+        security_violations = conn.execute(
+            "SELECT COUNT(*) FROM alerts WHERE object LIKE '%SECURITY ALERT%' AND timestamp LIKE ?",
+            (f"{today_date}%",),
+        ).fetchone()[0]
+
         cam_count = conn.execute(
             "SELECT COUNT(*) FROM cameras WHERE ai_enabled = 1"
         ).fetchone()[0]
 
-        # Enrolled people
         people_count = conn.execute(
             "SELECT COUNT(*) FROM people WHERE status = 'active'"
         ).fetchone()[0]
@@ -111,18 +124,16 @@ def generate_daily_work_log(today_date: Optional[str] = None) -> Dict[str, Any]:
                 "active_cameras_monitored": cam_count,
                 "verified_identities_on_file": people_count,
                 "attendances_marked_today": att_count,
-                "dress_code_audits_performed": att_count + 12,
-                "dress_code_violations_intercepted": 0,
-                "exam_proctoring_checks": 45,
-                "security_alerts_logged": alerts_today,
-                "average_inference_latency": "16.4ms",
-                "uptime_percentage": "99.98%",
+                "dress_code_violations_logged": dress_violations,
+                "safety_ppe_violations_logged": safety_violations,
+                "critical_security_alerts": security_violations,
+                "total_alerts_logged": alerts_today,
             },
             "recent_autonomous_actions": _recent_actions[-25:],
             "ai_self_assessment": (
-                f"{_ai_config['name']} operated continuously without interruptions. "
-                f"All {cam_count} surveillance streams maintained normal throughput. "
-                f"Automated face recognition, attendance timestamping, and uniform compliance engines are operating at peak fidelity."
+                f"{_ai_config['name']} is operating continuously in real-time. "
+                f"Currently monitoring {cam_count} assigned surveillance camera streams. "
+                f"Face recognition, automated attendance, uniform compliance, and safety threat detection are operational."
             ),
             "generated_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         }
@@ -137,37 +148,28 @@ def generate_daily_work_log(today_date: Optional[str] = None) -> Dict[str, Any]:
 
         md_content = f"""# 🧠 {_ai_config['name'].upper()} — 24/7 DAILY SURVEILLANCE WORK LOG
 **Date:** `{today_date}`  
-**AI Manager & Commander:** `{_ai_config['name']}`  
+**AI Manager & Supervisor:** `{_ai_config['name']}` ({_ai_config['codename']})  
 **Operational Status:** `24/7 ONLINE & CONTINUOUSLY MONITORING`  
 **Current Uptime:** `{uptime_str}`  
 **Speed Profile:** `{_ai_config['speed_mode']}` | **Autonomy:** `{_ai_config['autonomy_level']}`
 
 ---
 
-## 📈 Today's Operational Accomplishments
-| Operational Task | Accomplished Count | Status |
-|------------------|--------------------|--------|
-| Active Cameras Monitored | {cam_count} | Normal |
+## 📊 Operational Telemetry
+| Metric | Real Count | Status |
+|--------|------------|--------|
+| Active Cameras Monitored | {cam_count} | Active |
 | Enrolled Biometric Profiles | {people_count} | Verified |
-| Attendances Marked & Timestamped | {att_count} | Logged & Synced |
-| Dress Code & Uniform Evaluations | {att_count + 12} | Evaluated |
-| Exam Proctoring & Prohibited Device Checks | 45 | Safe |
-| Security Incidents Intercepted | {alerts_today} | Managed |
+| Attendances Marked & Timestamped | {att_count} | Synced |
+| Dress Code Violations Logged | {dress_violations} | Monitored |
+| Safety & PPE Violations Logged | {safety_violations} | Monitored |
+| Critical Security Alerts | {security_violations} | Intercepted |
+| Total Active/Resolved Alerts | {alerts_today} | Managed |
 
 ---
 
-## ⚡ Autonomous Action Feed (Chronological)
-"""
-        for act in reversed(_recent_actions[-15:]):
-            md_content += f"- **[{act.get('timestamp')}] [{act.get('module')}]**: {act.get('action')}\n"
-
-        md_content += f"""
----
-
-## 🛡️ JARVIS Executive Summary
-> "{log_data['ai_self_assessment']}"
-
-*Recorded automatically by {_ai_config['name']} 24/7 Operations Hub.*
+## 🤖 VANTEP AI Executive Assessment
+Subject monitoring and per-camera function enforcement active across all sectors. All individual folders and evidence snapshots synchronized.
 """
         with open(md_file, "w", encoding="utf-8") as f:
             f.write(md_content)
@@ -178,7 +180,8 @@ def generate_daily_work_log(today_date: Optional[str] = None) -> Dict[str, Any]:
 
 
 @router.get("/status")
-def get_ai_status():
+def get_ai_brain_status():
+    """Returns real-time health and operational configuration of VANTEP AI."""
     uptime_seconds = int(time.time() - START_TIME)
     hours, rem = divmod(uptime_seconds, 3600)
     minutes, seconds = divmod(rem, 60)
@@ -186,17 +189,20 @@ def get_ai_status():
 
     conn = get_db()
     try:
-        today_date = datetime.datetime.now().strftime("%Y-%m-%d")
-        att_count = conn.execute(
-            "SELECT COUNT(*) FROM attendance_records WHERE timestamp LIKE ?",
-            (f"{today_date}%",),
-        ).fetchone()[0]
-        alert_count = conn.execute(
-            "SELECT COUNT(*) FROM alerts WHERE UPPER(status) = 'ACTIVE'"
-        ).fetchone()[0]
-        people_count = conn.execute("SELECT COUNT(*) FROM people").fetchone()[0]
-        cam_count = conn.execute(
+        active_cams = conn.execute(
             "SELECT COUNT(*) FROM cameras WHERE ai_enabled = 1"
+        ).fetchone()[0]
+        total_people = conn.execute(
+            "SELECT COUNT(*) FROM people WHERE status = 'active'"
+        ).fetchone()[0]
+        today_str = datetime.datetime.now().strftime("%Y-%m-%d")
+        today_att = conn.execute(
+            "SELECT COUNT(*) FROM attendance_records WHERE timestamp LIKE ?",
+            (f"{today_str}%",),
+        ).fetchone()[0]
+        today_alerts = conn.execute(
+            "SELECT COUNT(*) FROM alerts WHERE timestamp LIKE ?",
+            (f"{today_str}%",),
         ).fetchone()[0]
     finally:
         conn.close()
@@ -204,99 +210,107 @@ def get_ai_status():
     return {
         "success": True,
         "name": _ai_config["name"],
-        "status": _ai_config["current_status"],
-        "uptime": uptime_str,
-        "uptime_seconds": uptime_seconds,
+        "ai_name": _ai_config["name"],
+        "status": _ai_config.get("current_status", "ONLINE_AND_MONITORING"),
+        "codename": _ai_config["codename"],
         "speed_mode": _ai_config["speed_mode"],
         "autonomy_level": _ai_config["autonomy_level"],
         "voice_announcements": _ai_config["voice_announcements"],
         "neural_threads": _ai_config["neural_threads"],
-        "latency_ms": 15.8,
-        "stats": {
-            "attendances_today": att_count,
-            "active_alerts": alert_count,
-            "people_registered": people_count,
-            "cameras_active": cam_count,
-            "fps_target": (
-                30
-                if _ai_config["speed_mode"] == "BALANCED"
-                else (60 if _ai_config["speed_mode"] == "TURBO" else 45)
-            ),
-        },
-        "current_thought": f"{_ai_config['name']} is actively supervising {cam_count} operational camera feeds. All sectors operating within normal parameters.",
+        "current_status": _ai_config["current_status"],
+        "uptime": uptime_str,
+        "uptime_seconds": uptime_seconds,
+        "active_cameras": active_cams,
+        "enrolled_personnel": total_people,
+        "today_attendance_count": today_att,
+        "today_alerts_count": today_alerts,
+        "last_heartbeat": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
     }
 
 
 @router.post("/config")
 def update_ai_config(req: AIConfigRequest):
-    if req.name:
+    """Updates AI operational parameters (name, speed mode, autonomy, voice announcements)."""
+    if req.name is not None:
         _ai_config["name"] = req.name.strip()
-    if req.speed_mode:
+    if req.speed_mode is not None:
         _ai_config["speed_mode"] = req.speed_mode.upper()
-    if req.autonomy_level:
+    if req.autonomy_level is not None:
         _ai_config["autonomy_level"] = req.autonomy_level.upper()
     if req.voice_announcements is not None:
         _ai_config["voice_announcements"] = req.voice_announcements
 
-    # Log action
-    _recent_actions.append(
-        {
-            "id": len(_recent_actions) + 1,
-            "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "module": "CORE_CONFIG",
-            "action": f"Configuration modified: Name='{_ai_config['name']}', Speed='{_ai_config['speed_mode']}', Autonomy='{_ai_config['autonomy_level']}'.",
-            "severity": "INFO",
-        }
+    record_ai_action(
+        module="SUPERVISOR",
+        action=f"VANTEP AI parameters updated: Speed={_ai_config['speed_mode']}, Autonomy={_ai_config['autonomy_level']}.",
+        severity="INFO",
     )
 
-    return {"success": True, "config": _ai_config}
+    return {
+        "success": True,
+        "message": "VANTEP AI configuration updated successfully",
+        "config": _ai_config,
+    }
 
 
 @router.get("/daily-log")
-def get_daily_log():
+def get_daily_work_log():
     return generate_daily_work_log()
 
 
 @router.get("/daily-log/markdown")
-def get_daily_log_markdown():
+def get_daily_work_log_markdown():
     today_date = datetime.datetime.now().strftime("%Y-%m-%d")
     generate_daily_work_log(today_date)
-    md_file = ensure_daily_log_dir() / f"ai_work_log_{today_date}.md"
+    log_dir = ensure_daily_log_dir()
+    md_file = log_dir / f"ai_work_log_{today_date}.md"
     if md_file.exists():
         with open(md_file, "r", encoding="utf-8") as f:
             content = f.read()
         return Response(content=content, media_type="text/markdown")
-    return Response(content="# Daily log not found", media_type="text/markdown")
+    return Response(
+        content="# VANTEP AI Daily Work Log Pending", media_type="text/markdown"
+    )
 
 
 @router.post("/action")
-def log_ai_action(req: LogActionRequest):
-    act = {
-        "id": len(_recent_actions) + 1,
-        "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "module": req.module,
-        "action": req.action,
-        "severity": req.severity or "INFO",
-    }
-    _recent_actions.append(act)
-    if len(_recent_actions) > 200:
-        _recent_actions.pop(0)
-    return {"success": True, "action": act}
+def log_ai_action_endpoint(req: LogActionRequest):
+    return record_ai_action(req.module, req.action, req.severity, req.metadata)
 
 
 @router.get("/actions")
-def list_ai_actions(limit: int = 30):
-    return {"count": len(_recent_actions), "actions": _recent_actions[-limit:][::-1]}
+def list_ai_actions(limit: int = 50):
+    return {
+        "count": len(_recent_actions),
+        "actions": list(reversed(_recent_actions[-limit:])),
+    }
 
 
-def record_ai_event(module: str, action: str, severity: str = "INFO"):
+def record_ai_action(
+    module: str,
+    action: str,
+    severity: str = "INFO",
+    metadata: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
     act = {
         "id": len(_recent_actions) + 1,
         "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "module": module,
         "action": action,
         "severity": severity,
+        "metadata": metadata or {},
     }
     _recent_actions.append(act)
     if len(_recent_actions) > 200:
         _recent_actions.pop(0)
+    return act
+
+
+def record_ai_event(
+    module: str,
+    action: str,
+    severity: str = "INFO",
+    metadata: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Compatibility alias for record_ai_action."""
+    return record_ai_action(module, action, severity, metadata)

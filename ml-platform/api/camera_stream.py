@@ -320,45 +320,104 @@ async def upload_camera_frame(camera_id: str, file: UploadFile = File(...)):
     now_ts = time.time()
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    # PILLAR 1: Face Attendance (Auto-mark present for enrolled identities)
-    if analysis.get("is_match") and analysis.get("matched_person"):
-        p_id = analysis["matched_person"]["id"]
-        try:
-            conn = get_db_connection()
-            today_str = datetime.now().strftime("%Y-%m-%d")
-            existing = conn.execute(
-                "SELECT id FROM attendance_records WHERE person_id = ? AND timestamp LIKE ?",
-                (p_id, f"{today_str}%"),
-            ).fetchone()
-            if not existing:
-                status = "LATE" if datetime.now().hour >= 9 else "PRESENT"
-                conn.execute(
-                    """
-                    INSERT INTO attendance_records (person_id, camera_id, environment_id, timestamp, confidence, status)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        p_id,
-                        int(camera_id) if camera_id.isdigit() else 1,
-                        environment_id,
-                        now_str,
-                        analysis["similarity"],
-                        status,
-                    ),
-                )
-                conn.commit()
-            conn.close()
-        except Exception as e:
-            print(f"[CameraStream] Attendance recording error: {e}")
+    # PILLAR 1: Face Attendance & Unknown Capture
+    face_is_detected = analysis.get("face_detected", False)
+    cam_name = f"Camera #{camera_id}"
+    cam_loc = "Main Sector"
 
-    # PILLAR 2: Dress Code & ID Card Compliance (Evaluated for EVERY person: enrolled or unenrolled)
-    dress = analysis.get("dress_code")
-    if dress:
+    # Fetch camera name & location from DB if available
+    try:
+        conn = get_db_connection()
+        c_row = conn.execute(
+            "SELECT camera_name, location FROM cameras WHERE id = ?", (str_id,)
+        ).fetchone()
+        if c_row:
+            cam_name = c_row["camera_name"] or cam_name
+            cam_loc = c_row["location"] or cam_loc
+        conn.close()
+    except Exception:
+        pass
+
+    # Encode current frame as JPEG bytes for snapshots
+    frame_jpeg_bytes = None
+    if face_is_detected:
+        try:
+            _, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
+            frame_jpeg_bytes = buf.tobytes()
+        except Exception:
+            frame_jpeg_bytes = None
+
+    from api.dossier_manager import (
+        record_person_attendance_file,
+        record_person_violation_file,
+        record_unknown_person_capture,
+    )
+
+    if face_is_detected:
+        if analysis.get("is_match") and analysis.get("matched_person"):
+            p_id = analysis["matched_person"]["id"]
+            analysis["matched_person"]["name"]
+            try:
+                conn = get_db_connection()
+                today_str = datetime.now().strftime("%Y-%m-%d")
+                existing = conn.execute(
+                    "SELECT id FROM attendance_records WHERE person_id = ? AND timestamp LIKE ?",
+                    (p_id, f"{today_str}%"),
+                ).fetchone()
+                if not existing:
+                    status = "LATE" if datetime.now().hour >= 9 else "PRESENT"
+                    conn.execute(
+                        """
+                        INSERT INTO attendance_records (person_id, camera_id, environment_id, timestamp, confidence, status)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            p_id,
+                            int(camera_id) if camera_id.isdigit() else 1,
+                            environment_id,
+                            now_str,
+                            analysis["similarity"],
+                            status,
+                        ),
+                    )
+                    conn.commit()
+                    # Record into person's physical folder managed by VANTEP AI
+                    record_person_attendance_file(
+                        person_id=p_id,
+                        status=status,
+                        confidence=analysis["similarity"],
+                        camera_name=cam_name,
+                        location=cam_loc,
+                        snapshot_bytes=frame_jpeg_bytes,
+                    )
+                conn.close()
+            except Exception as e:
+                print(f"[CameraStream] Attendance recording error: {e}")
+        else:
+            # Unidentified visitor: Capture snapshot into unknown_persons repository
+            unk_key = f"unk_{camera_id}"
+            if frame_jpeg_bytes and (
+                now_ts - stream_alert_cooldown.get(unk_key, 0) > 20
+            ):
+                stream_alert_cooldown[unk_key] = now_ts
+                try:
+                    record_unknown_person_capture(
+                        env_id=environment_id,
+                        camera_name=cam_name,
+                        location=cam_loc,
+                        face_roi_bytes=frame_jpeg_bytes,
+                        gender=analysis.get("detected_gender", "person"),
+                    )
+                except Exception as ex:
+                    print(f"[CameraStream] Unknown capture error: {ex}")
+
+    # PILLAR 2: Dress Code & ID Card Compliance (Evaluated ONLY when face/person is actually in frame)
+    if face_is_detected:
+        dress = analysis.get("dress_code", {})
         is_dress_pass = dress.get("dress_compliant", True)
         has_id = dress.get("id_card_detected", False)
         dress_type = dress.get("dress_type", "Regular Formals")
 
-        # Log alert if wearing casual attire or ID card is missing
         if not is_dress_pass or not has_id:
             person_name = (
                 analysis["matched_person"]["name"]
@@ -368,42 +427,84 @@ async def upload_camera_frame(camera_id: str, file: UploadFile = File(...)):
             cooldown_key = f"dress_{camera_id}_{person_name}"
             if now_ts - stream_alert_cooldown.get(cooldown_key, 0) > 25:
                 stream_alert_cooldown[cooldown_key] = now_ts
+                reasons = []
+                if not is_dress_pass:
+                    reasons.append(f"Casual Attire ({dress_type})")
+                if not has_id:
+                    reasons.append("Missing ID Card")
+                violation_detail = " & ".join(reasons)
+                priority = "HIGH" if (not is_dress_pass and not has_id) else "MEDIUM"
+                desc = (
+                    f"DRESS CODE VIOLATION: {person_name} • {violation_detail} detected"
+                )
+
                 try:
                     conn = get_db_connection()
-                    reasons = []
-                    if not is_dress_pass:
-                        reasons.append(f"Casual Attire ({dress_type})")
-                    if not has_id:
-                        reasons.append("Missing ID Card")
-                    violation_detail = " & ".join(reasons)
-                    priority = (
-                        "HIGH" if (not is_dress_pass and not has_id) else "MEDIUM"
-                    )
-
                     conn.execute(
                         """
                         INSERT INTO alerts (timestamp, object, priority, confidence, status, camera_id)
                         VALUES (?, ?, ?, 0.92, 'ACTIVE', ?)
                         """,
-                        (
-                            now_str,
-                            f"DRESS CODE VIOLATION: {person_name} — {violation_detail} detected",
-                            priority,
-                            str(camera_id),
-                        ),
+                        (now_str, desc, priority, str(camera_id)),
                     )
                     conn.commit()
                     conn.close()
+
+                    # If enrolled, update individual violations folder
+                    if analysis.get("is_match") and analysis.get("matched_person"):
+                        record_person_violation_file(
+                            person_id=analysis["matched_person"]["id"],
+                            violation_type="DRESS_CODE_VIOLATION",
+                            severity=priority,
+                            description=violation_detail,
+                            camera_name=cam_name,
+                            location=cam_loc,
+                            proof_bytes=frame_jpeg_bytes,
+                        )
                 except Exception as e:
                     print(f"[CameraStream] Dress alert error: {e}")
 
-    # PILLAR 3: Security & Prohibited Activities (Smartphones, Cheating, Weapons)
+    # PILLAR 3: Safety PPE Compliance (When assigned function is SAFETY / DRESS_CODE_PPE)
+    if face_is_detected and assigned_function.upper() in ["SAFETY", "DRESS_CODE_PPE"]:
+        ppe = analysis.get("safety_ppe", {})
+        if ppe.get("ppe_active") and not ppe.get("ppe_compliant", True):
+            ppe_key = f"ppe_{camera_id}"
+            if now_ts - stream_alert_cooldown.get(ppe_key, 0) > 25:
+                stream_alert_cooldown[ppe_key] = now_ts
+                ppe_label = ppe.get("status_label", "Safety gear missing")
+                try:
+                    conn = get_db_connection()
+                    conn.execute(
+                        """
+                        INSERT INTO alerts (timestamp, object, priority, confidence, status, camera_id)
+                        VALUES (?, ?, 'HIGH', 0.94, 'ACTIVE', ?)
+                        """,
+                        (now_str, f"SAFETY HAZARD: {ppe_label}", str(camera_id)),
+                    )
+                    conn.commit()
+                    conn.close()
+
+                    if analysis.get("is_match") and analysis.get("matched_person"):
+                        record_person_violation_file(
+                            person_id=analysis["matched_person"]["id"],
+                            violation_type="SAFETY_PPE_VIOLATION",
+                            severity="HIGH",
+                            description=ppe_label,
+                            camera_name=cam_name,
+                            location=cam_loc,
+                            proof_bytes=frame_jpeg_bytes,
+                        )
+                except Exception as e:
+                    print(f"[CameraStream] Safety alert error: {e}")
+
+    # PILLAR 4: Security & Prohibited Activities (Smartphones, Cheating, Weapons)
     prohibited = analysis.get("prohibited_items", [])
-    if prohibited:
+    if prohibited and face_is_detected:
         item = prohibited[0].upper()
         sec_key = f"sec_{camera_id}_{item}"
         if now_ts - stream_alert_cooldown.get(sec_key, 0) > 25:
             stream_alert_cooldown[sec_key] = now_ts
+            desc = f"CRITICAL SECURITY ALERT: PROHIBITED {item} DETECTED IN CAMERA FEED"
             try:
                 conn = get_db_connection()
                 conn.execute(
@@ -411,14 +512,21 @@ async def upload_camera_frame(camera_id: str, file: UploadFile = File(...)):
                     INSERT INTO alerts (timestamp, object, priority, confidence, status, camera_id)
                     VALUES (?, ?, 'CRITICAL', 0.96, 'ACTIVE', ?)
                     """,
-                    (
-                        now_str,
-                        f"CRITICAL SECURITY ALERT: PROHIBITED {item} DETECTED IN CAMERA FEED",
-                        str(camera_id),
-                    ),
+                    (now_str, desc, str(camera_id)),
                 )
                 conn.commit()
                 conn.close()
+
+                if analysis.get("is_match") and analysis.get("matched_person"):
+                    record_person_violation_file(
+                        person_id=analysis["matched_person"]["id"],
+                        violation_type="PROHIBITED_ACTIVITY",
+                        severity="CRITICAL",
+                        description=f"Prohibited {item} usage",
+                        camera_name=cam_name,
+                        location=cam_loc,
+                        proof_bytes=frame_jpeg_bytes,
+                    )
             except Exception as e:
                 print(f"[CameraStream] Security alert error: {e}")
 

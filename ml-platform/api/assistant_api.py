@@ -11,7 +11,7 @@ DATABASE_PATH = BASE_DIR / "database" / "sentronix.db"
 
 router = APIRouter(
     prefix="/assistant",
-    tags=["Sentronix AI Operations Assistant"],
+    tags=["VANTEP AI Autonomous Assistant (JARVIS Class)"],
 )
 
 
@@ -225,7 +225,7 @@ def assistant_chat(req: ChatMessageRequest):
     # 5. Default Operator Assistance
     return {
         "reply": (
-            "I am the Sentronix AI Surveillance Operations Assistant. You can ask me:\n"
+            "VANTEP online, Commander. I am your 24/7 autonomous surveillance AI, operating perimeters, dress compliance, biometric attendance, and security triage. You can ask me:\n"
             "• 'How many students are present today?'\n"
             "• 'Which cameras are offline?'\n"
             "• 'Show active critical alerts'\n"

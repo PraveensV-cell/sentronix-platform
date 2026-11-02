@@ -1,18 +1,31 @@
-import json
-import sqlite3
+import base64
 import datetime
 from pathlib import Path
-from typing import Optional, List
-from fastapi import APIRouter, HTTPException, Response
-from api.dossier_manager import get_person_dossier, generate_and_save_dossier
+from typing import List, Optional
+import sqlite3
+
+from fastapi import APIRouter, File, HTTPException, Response, UploadFile
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
+
+from api.dossier_manager import (
+    add_custom_file_to_person_folder,
+    delete_file_from_person_folder,
+    get_person_dossier,
+    get_person_dossier_markdown,
+    get_person_folder,
+    get_person_folder_info,
+    get_unknown_captures,
+    get_unknown_folder,
+    init_or_update_person_folder,
+)
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATABASE_PATH = BASE_DIR / "database" / "sentronix.db"
 
 router = APIRouter(
     prefix="/people",
-    tags=["People & Face Registry"],
+    tags=["People, Biometrics & VANTEP AI Dossiers"],
 )
 
 
@@ -25,8 +38,8 @@ def get_connection():
 
 class CreatePersonRequest(BaseModel):
     name: str
-    identifier: str  # Student / Staff ID (e.g. STU-101)
-    role: str = "student"  # student, staff, visitor
+    identifier: str  # Student / Staff / Worker ID (e.g. STU-101)
+    role: str = "student"  # student, staff, worker, officer, visitor
     department: Optional[str] = "General"
     class_grade: Optional[str] = "Standard"
     allowed_dress: Optional[str] = "Formals & Regular Uniform"
@@ -80,7 +93,7 @@ def list_people(role: Optional[str] = None, environment_id: Optional[int] = 1):
                 SELECT timestamp, status, confidence FROM attendance_records
                 WHERE person_id = ? AND timestamp LIKE ?
                 ORDER BY id DESC LIMIT 1
-            """,
+                """,
                 (p["id"], f"{today}%"),
             ).fetchone()
             if att:
@@ -108,7 +121,7 @@ def get_person(person_id: int):
             SELECT timestamp, status, confidence FROM attendance_records
             WHERE person_id = ? AND timestamp LIKE ?
             ORDER BY id DESC LIMIT 1
-        """,
+            """,
             (person_id, f"{today}%"),
         ).fetchone()
         if att:
@@ -132,7 +145,6 @@ def create_person(req: CreatePersonRequest):
             raise HTTPException(status_code=400, detail="Identifier already registered")
 
         cursor = conn.cursor()
-        is_enrolled = 0
         cursor.execute(
             """
             INSERT INTO people (
@@ -140,7 +152,7 @@ def create_person(req: CreatePersonRequest):
                 class_grade, allowed_dress, phone, email, photo_url, is_enrolled, status
             )
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'active')
-        """,
+            """,
             (
                 req.environment_id or 1,
                 req.identifier,
@@ -158,53 +170,44 @@ def create_person(req: CreatePersonRequest):
         new_id = cursor.lastrowid
 
         # Extract real facial embedding and enroll biometrics if photo_url is provided
-        if req.photo_url:
-            extracted = False
-            if "base64," in req.photo_url:
-                try:
-                    import base64
-                    from api.face_recognition_service import enroll_person_embedding
+        raw_photo_bytes = None
+        if req.photo_url and "base64," in req.photo_url:
+            try:
+                from api.face_recognition_service import enroll_person_embedding
 
-                    b64_data = req.photo_url.split("base64,")[1]
-                    img_bytes = base64.b64decode(b64_data)
-                    extracted = enroll_person_embedding(new_id, img_bytes)
-                except Exception as ex:
-                    print(f"[create_person] Error extracting embedding: {ex}")
+                b64_data = req.photo_url.split("base64,")[1]
+                raw_photo_bytes = base64.b64decode(b64_data)
+                enroll_person_embedding(new_id, raw_photo_bytes)
+            except Exception as ex:
+                print(f"[create_person] Error extracting embedding: {ex}")
 
-            if not extracted:
-                embedding = [0.1 * ((i + new_id) % 10) for i in range(128)]
-                conn.execute(
-                    """
-                    INSERT INTO face_embeddings (person_id, embedding_json, feature_version)
-                    VALUES (?, ?, 'v2')
-                    """,
-                    (new_id, json.dumps(embedding)),
-                )
-            conn.execute("UPDATE people SET is_enrolled = 1 WHERE id = ?", (new_id,))
-            conn.commit()
-            is_enrolled = 1
-
-        try:
-            generate_and_save_dossier(new_id, conn)
-        except Exception as e:
-            print(f"[create_person] Auto-generate dossier error: {e}")
+        # Initialize physical folder for this individual managed by VANTEP AI
+        person_data = {
+            "id": new_id,
+            "environment_id": req.environment_id or 1,
+            "name": req.name,
+            "identifier": req.identifier,
+            "role": req.role,
+            "department": req.department,
+            "class_grade": req.class_grade,
+            "allowed_dress": req.allowed_dress,
+            "phone": req.phone,
+            "email": req.email,
+            "photo_url": req.photo_url,
+            "is_enrolled": 1 if raw_photo_bytes else 0,
+        }
+        init_or_update_person_folder(
+            new_id,
+            person_dict=person_data,
+            photo_bytes=raw_photo_bytes,
+            conn=conn,
+        )
 
         return {
             "success": True,
-            "message": f"Registered {req.name}. Face biometric profile active.",
-            "person": {
-                "id": new_id,
-                "identifier": req.identifier,
-                "name": req.name,
-                "role": req.role,
-                "department": req.department,
-                "class_grade": req.class_grade,
-                "allowed_dress": req.allowed_dress or "Formals & Regular Uniform",
-                "phone": req.phone,
-                "email": req.email,
-                "photo_url": req.photo_url,
-                "is_enrolled": is_enrolled,
-            },
+            "id": new_id,
+            "message": f"Enrolled {req.name} and initialized VANTEP AI dossier folder",
+            "person": person_data,
         }
     finally:
         conn.close()
@@ -212,7 +215,6 @@ def create_person(req: CreatePersonRequest):
 
 @router.patch("/{person_id}")
 def update_person(person_id: int, req: UpdatePersonRequest):
-    """Allows modifying person name, ID, department, dress code, role, status, etc."""
     conn = get_connection()
     try:
         person = conn.execute(
@@ -260,47 +262,250 @@ def update_person(person_id: int, req: UpdatePersonRequest):
             )
             conn.commit()
 
-        # If photo was updated, refresh face embedding & dossier
-        if req.photo_url:
-            extracted = False
-            if "base64," in req.photo_url:
-                try:
-                    import base64
-                    from api.face_recognition_service import enroll_person_embedding
+        # If photo was updated, refresh face embedding
+        raw_photo_bytes = None
+        if req.photo_url and "base64," in req.photo_url:
+            try:
+                from api.face_recognition_service import enroll_person_embedding
 
-                    b64_data = req.photo_url.split("base64,")[1]
-                    img_bytes = base64.b64decode(b64_data)
-                    extracted = enroll_person_embedding(person_id, img_bytes)
-                except Exception as ex:
-                    print(f"[update_person] Face embedding update error: {ex}")
-
-            if not extracted and ("http" in req.photo_url or "data:" in req.photo_url):
-                embedding = [0.1 * ((i + person_id) % 10) for i in range(128)]
+                b64_data = req.photo_url.split("base64,")[1]
+                raw_photo_bytes = base64.b64decode(b64_data)
+                enroll_person_embedding(person_id, raw_photo_bytes)
                 conn.execute(
-                    "DELETE FROM face_embeddings WHERE person_id = ?", (person_id,)
+                    "UPDATE people SET is_enrolled = 1 WHERE id = ?",
+                    (person_id,),
                 )
-                conn.execute(
-                    """
-                    INSERT INTO face_embeddings (person_id, embedding_json, feature_version)
-                    VALUES (?, ?, 'v2')
-                    """,
-                    (person_id, json.dumps(embedding)),
-                )
-            conn.execute("UPDATE people SET is_enrolled = 1 WHERE id = ?", (person_id,))
-            conn.commit()
-
-        try:
-            generate_and_save_dossier(person_id, conn)
-        except Exception as e:
-            print(f"[update_person] Dossier refresh error: {e}")
+                conn.commit()
+            except Exception as ex:
+                print(f"[update_person] Face embedding update error: {ex}")
 
         updated = conn.execute(
             "SELECT * FROM people WHERE id = ?", (person_id,)
         ).fetchone()
+        p_dict = dict(updated)
+
+        # Update physical folder managed by VANTEP AI
+        init_or_update_person_folder(
+            person_id,
+            person_dict=p_dict,
+            photo_bytes=raw_photo_bytes,
+            conn=conn,
+        )
+
         return {
             "success": True,
-            "message": f"Profile for {updated['name']} updated successfully",
-            "person": dict(updated),
+            "message": f"Profile for {p_dict['name']} updated successfully",
+            "person": p_dict,
+        }
+    finally:
+        conn.close()
+
+
+@router.delete("/{person_id}")
+def delete_person(person_id: int):
+    conn = get_connection()
+    try:
+        person = conn.execute(
+            "SELECT * FROM people WHERE id = ?", (person_id,)
+        ).fetchone()
+        if person:
+            env_id = person["environment_id"] or 1
+            folder = get_person_folder(env_id, person_id, person["name"])
+            import shutil
+
+            if folder.exists():
+                shutil.rmtree(folder, ignore_errors=True)
+
+        conn.execute("DELETE FROM face_embeddings WHERE person_id = ?", (person_id,))
+        conn.execute("DELETE FROM attendance_records WHERE person_id = ?", (person_id,))
+        conn.execute("DELETE FROM people WHERE id = ?", (person_id,))
+        conn.commit()
+        return {
+            "success": True,
+            "message": "Person and physical dossier folder deleted successfully",
+        }
+    finally:
+        conn.close()
+
+
+# ─── VANTEP AI PHYSICAL DOSSIER & FOLDER API ─────────────────────────────────
+
+
+@router.get("/{person_id}/folder")
+def get_person_folder_api(person_id: int):
+    """Returns full physical folder contents: profile, attendance records, violation records, and files."""
+    info = get_person_folder_info(person_id)
+    if "error" in info:
+        raise HTTPException(status_code=404, detail=info["error"])
+    return info
+
+
+@router.post("/{person_id}/folder/files")
+async def upload_file_to_person_folder(person_id: int, file: UploadFile = File(...)):
+    """Allows controller to upload any custom file/document directly into the individual's folder."""
+    contents = await file.read()
+    res = add_custom_file_to_person_folder(person_id, file.filename, contents)
+    if "error" in res:
+        raise HTTPException(status_code=400, detail=res["error"])
+    return res
+
+
+@router.get("/{person_id}/folder/files/{filename}")
+def download_file_from_person_folder(person_id: int, filename: str):
+    """Downloads or views a file from the individual's folder."""
+    conn = get_connection()
+    try:
+        person = conn.execute(
+            "SELECT * FROM people WHERE id = ?", (person_id,)
+        ).fetchone()
+        if not person:
+            raise HTTPException(status_code=404, detail="Person not found")
+        env_id = person["environment_id"] or 1
+        folder = get_person_folder(env_id, person_id, person["name"])
+
+        # Check in root or in snapshots
+        target = folder / filename
+        if not target.exists():
+            target = folder / "snapshots" / filename
+        if not target.exists():
+            raise HTTPException(status_code=404, detail="File not found")
+
+        return FileResponse(path=str(target), filename=filename)
+    finally:
+        conn.close()
+
+
+@router.delete("/{person_id}/folder/files/{filename}")
+def delete_file_from_person_folder_api(person_id: int, filename: str):
+    """Deletes a custom file from the individual's folder."""
+    res = delete_file_from_person_folder(person_id, filename)
+    if "error" in res:
+        raise HTTPException(status_code=400, detail=res["error"])
+    return res
+
+
+# ─── UNKNOWN PERSONS CAPTURE REPOSITORY ──────────────────────────────────────
+
+
+@router.get("/environment/{env_id}/unknowns")
+def list_unknown_captures(env_id: int):
+    """Returns all captured unidentified persons logged by VANTEP AI in attendance/surveillance mode."""
+    records = get_unknown_captures(env_id)
+    return {"count": len(records), "unknown_records": records}
+
+
+@router.get("/environment/{env_id}/unknowns/{filename}")
+def get_unknown_photo(env_id: int, filename: str):
+    folder = get_unknown_folder(env_id)
+    target = folder / filename
+    if not target.exists():
+        raise HTTPException(status_code=404, detail="Unknown capture image not found")
+    return FileResponse(path=str(target), filename=filename)
+
+
+# ─── BATCH DATASET IMPORT ────────────────────────────────────────────────────
+
+
+@router.post("/batch")
+def create_people_batch(req: BatchCreatePeopleRequest):
+    """Batch imports staff/students/workers dataset and creates physical folders for each individual."""
+    conn = get_connection()
+    try:
+        created = []
+        for p in req.people:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                INSERT OR REPLACE INTO people (name, identifier, role, department, class_grade, allowed_dress, phone, email, photo_url, environment_id, is_enrolled, status)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 'active')
+                """,
+                (
+                    p.name,
+                    p.identifier,
+                    p.role,
+                    p.department,
+                    p.class_grade,
+                    p.allowed_dress,
+                    p.phone,
+                    p.email,
+                    p.photo_url,
+                    p.environment_id or req.environment_id or 1,
+                ),
+            )
+            pid = cursor.lastrowid
+            created.append({"id": pid, "name": p.name, "identifier": p.identifier})
+
+            # Extract real face embedding if photo was uploaded
+            raw_photo_bytes = None
+            if p.photo_url and "base64," in p.photo_url:
+                try:
+                    from api.face_recognition_service import (
+                        enroll_person_embedding,
+                    )
+
+                    b64_data = p.photo_url.split("base64,")[1]
+                    raw_photo_bytes = base64.b64decode(b64_data)
+                    enroll_person_embedding(pid, raw_photo_bytes)
+                except Exception as ex:
+                    print(f"Batch face embedding extraction error for {pid}: {ex}")
+
+            # Initialize physical folder for each individual
+            init_or_update_person_folder(
+                pid,
+                person_dict={
+                    "id": pid,
+                    "name": p.name,
+                    "identifier": p.identifier,
+                    "role": p.role,
+                    "department": p.department,
+                    "class_grade": p.class_grade,
+                    "allowed_dress": p.allowed_dress,
+                    "phone": p.phone,
+                    "email": p.email,
+                    "photo_url": p.photo_url,
+                    "environment_id": p.environment_id or req.environment_id or 1,
+                    "is_enrolled": 1 if raw_photo_bytes else 0,
+                },
+                photo_bytes=raw_photo_bytes,
+                conn=conn,
+            )
+
+        conn.commit()
+        return {
+            "success": True,
+            "count": len(created),
+            "people": created,
+            "message": f"Successfully enrolled {len(created)} personnel profiles with VANTEP AI dossiers",
+        }
+    finally:
+        conn.close()
+
+
+@router.delete("/environment/{env_id}/clear")
+def clear_environment_people(env_id: int):
+    conn = get_connection()
+    try:
+        conn.execute(
+            "DELETE FROM face_embeddings WHERE person_id IN (SELECT id FROM people WHERE environment_id = ?)",
+            (env_id,),
+        )
+        conn.execute(
+            "DELETE FROM attendance_records WHERE person_id IN (SELECT id FROM people WHERE environment_id = ?)",
+            (env_id,),
+        )
+        conn.execute("DELETE FROM people WHERE environment_id = ?", (env_id,))
+        conn.commit()
+
+        # Clean dossiers directory for this environment
+        import shutil
+
+        env_dossier_dir = BASE_DIR / "dossiers" / f"env_{env_id}"
+        if env_dossier_dir.exists():
+            shutil.rmtree(env_dossier_dir, ignore_errors=True)
+
+        return {
+            "success": True,
+            "message": f"Cleared personnel and folders for environment #{env_id}",
         }
     finally:
         conn.close()
@@ -317,7 +522,6 @@ def get_person_history(person_id: int):
         if not person:
             raise HTTPException(status_code=404, detail="Person not found")
 
-        # Attendance logs with camera names
         att_rows = conn.execute(
             """
             SELECT a.id, a.timestamp, a.status, a.confidence, c.camera_name, a.presence_seconds
@@ -326,11 +530,10 @@ def get_person_history(person_id: int):
             WHERE a.person_id = ?
             ORDER BY a.id DESC
             LIMIT 50
-        """,
+            """,
             (person_id,),
         ).fetchall()
 
-        # Detections / Alerts / Incident history
         alert_rows = conn.execute(
             """
             SELECT id, timestamp, object, priority, status, camera_id
@@ -338,7 +541,7 @@ def get_person_history(person_id: int):
             WHERE object LIKE ? OR object LIKE ?
             ORDER BY id DESC
             LIMIT 20
-        """,
+            """,
             (f"%{person['name']}%", f"%{person['identifier']}%"),
         ).fetchall()
 
@@ -371,9 +574,7 @@ def get_person_history(person_id: int):
                 }
             )
 
-        # Sort combined history by timestamp descending
         history_records.sort(key=lambda x: str(x["timestamp"]), reverse=True)
-
         return {
             "success": True,
             "person": dict(person),
@@ -402,10 +603,21 @@ def mark_person_present(person_id: int):
             """
             INSERT INTO attendance_records (person_id, camera_id, environment_id, timestamp, confidence, status)
             VALUES (?, 1, ?, ?, 1.0, ?)
-        """,
+            """,
             (person_id, person["environment_id"] or 1, now_str, status),
         )
         conn.commit()
+
+        # Update physical attendance file
+        from api.dossier_manager import record_person_attendance_file
+
+        record_person_attendance_file(
+            person_id,
+            status="PRESENT",
+            confidence=1.0,
+            camera_name="Control Room Manual Check-in",
+            location="Administrator Terminal",
+        )
 
         return {
             "success": True,
@@ -428,150 +640,41 @@ def enroll_face(person_id: int, req: EnrollFaceRequest):
         if not person:
             raise HTTPException(status_code=404, detail="Person not found")
 
-        # Extract real facial embedding if photo_url is base64 image
-        extracted = False
+        raw_photo_bytes = None
         if req.photo_url and "base64," in req.photo_url:
             try:
-                import base64
                 from api.face_recognition_service import enroll_person_embedding
 
                 b64_data = req.photo_url.split("base64,")[1]
-                img_bytes = base64.b64decode(b64_data)
-                extracted = enroll_person_embedding(person_id, img_bytes)
+                raw_photo_bytes = base64.b64decode(b64_data)
+                enroll_person_embedding(person_id, raw_photo_bytes)
             except Exception as ex:
                 print(f"[PeopleAPI] Base64 face embedding extraction error: {ex}")
-
-        if not extracted:
-            embedding = req.embedding or [
-                0.1 * ((i + person_id) % 10) for i in range(128)
-            ]
-            embedding_json = json.dumps(embedding)
-            conn.execute(
-                "DELETE FROM face_embeddings WHERE person_id = ?", (person_id,)
-            )
-            conn.execute(
-                """
-                INSERT INTO face_embeddings (person_id, embedding_json, feature_version)
-                VALUES (?, ?, 'v2')
-            """,
-                (person_id, embedding_json),
-            )
 
         conn.execute(
             """
             UPDATE people
             SET is_enrolled = 1, photo_url = COALESCE(?, photo_url)
             WHERE id = ?
-        """,
+            """,
             (req.photo_url, person_id),
         )
-
         conn.commit()
 
-        try:
-            generate_and_save_dossier(person_id, conn)
-        except Exception as e:
-            print(f"[enroll_face] Dossier refresh error: {e}")
-
-        updated_p = conn.execute(
-            "SELECT photo_url FROM people WHERE id = ?", (person_id,)
-        ).fetchone()
+        # Refresh folder
+        init_or_update_person_folder(
+            person_id,
+            person_dict=dict(person),
+            photo_bytes=raw_photo_bytes,
+            conn=conn,
+        )
 
         return {
             "success": True,
             "message": f"Face enrollment completed for {person['name']}",
             "person_id": person_id,
             "is_enrolled": 1,
-            "photo_url": updated_p["photo_url"] if updated_p else req.photo_url,
-        }
-    finally:
-        conn.close()
-
-
-@router.delete("/{person_id}")
-def delete_person(person_id: int):
-    conn = get_connection()
-    try:
-        conn.execute("DELETE FROM face_embeddings WHERE person_id = ?", (person_id,))
-        conn.execute("DELETE FROM attendance_records WHERE person_id = ?", (person_id,))
-        conn.execute("DELETE FROM people WHERE id = ?", (person_id,))
-        conn.commit()
-        return {"success": True, "message": "Person deleted successfully"}
-    finally:
-        conn.close()
-
-
-@router.post("/batch")
-def create_people_batch(req: BatchCreatePeopleRequest):
-    conn = get_connection()
-    try:
-        created = []
-        for p in req.people:
-            cursor = conn.cursor()
-            cursor.execute(
-                """
-                INSERT OR REPLACE INTO people (name, identifier, role, department, class_grade, allowed_dress, phone, email, photo_url, environment_id, is_enrolled, status)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 'active')
-            """,
-                (
-                    p.name,
-                    p.identifier,
-                    p.role,
-                    p.department,
-                    p.class_grade,
-                    p.allowed_dress,
-                    p.phone,
-                    p.email,
-                    p.photo_url,
-                    p.environment_id or req.environment_id or 1,
-                ),
-            )
-            pid = cursor.lastrowid
-            created.append({"id": pid, "name": p.name, "identifier": p.identifier})
-            # Extract real face embedding if photo was uploaded
-            if p.photo_url and "base64," in p.photo_url:
-                try:
-                    import base64
-                    from api.face_recognition_service import enroll_person_embedding
-
-                    b64_data = p.photo_url.split("base64,")[1]
-                    img_bytes = base64.b64decode(b64_data)
-                    enroll_person_embedding(pid, img_bytes)
-                except Exception as ex:
-                    print(f"Batch face embedding extraction error for {pid}: {ex}")
-
-            try:
-                generate_and_save_dossier(pid, conn)
-            except Exception as e:
-                print(f"Could not auto-generate dossier for {pid}: {e}")
-        conn.commit()
-        return {
-            "success": True,
-            "count": len(created),
-            "people": created,
-            "message": f"Successfully enrolled {len(created)} personnel profiles",
-        }
-    finally:
-        conn.close()
-
-
-@router.delete("/environment/{env_id}/clear")
-def clear_environment_people(env_id: int):
-    conn = get_connection()
-    try:
-        conn.execute(
-            "DELETE FROM face_embeddings WHERE person_id IN (SELECT id FROM people WHERE environment_id = ?)",
-            (env_id,),
-        )
-        conn.execute(
-            "DELETE FROM attendance_records WHERE person_id IN (SELECT id FROM people WHERE environment_id = ?)",
-            (env_id,),
-        )
-        conn.execute("DELETE FROM people WHERE environment_id = ?", (env_id,))
-        conn.commit()
-        return {
-            "success": True,
-            "message": f"Cleared personnel for environment #{env_id}",
+            "photo_url": req.photo_url,
         }
     finally:
         conn.close()
@@ -579,23 +682,10 @@ def clear_environment_people(env_id: int):
 
 @router.get("/{person_id}/dossier")
 def get_dossier_data(person_id: int):
-    dossier = get_person_dossier(person_id)
-    if "error" in dossier:
-        raise HTTPException(status_code=404, detail=dossier["error"])
-    return dossier
+    return get_person_dossier(person_id)
 
 
 @router.get("/{person_id}/dossier/markdown")
 def get_dossier_markdown(person_id: int):
-    dossier = get_person_dossier(person_id)
-    if "error" in dossier:
-        raise HTTPException(status_code=404, detail=dossier["error"])
-    md_path = dossier.get("md_path")
-    if md_path and Path(md_path).exists():
-        with open(md_path, "r", encoding="utf-8") as f:
-            content = f.read()
-        return Response(content=content, media_type="text/markdown")
-    return Response(
-        content=f"# Dossier for {dossier.get('dossier_title')}",
-        media_type="text/markdown",
-    )
+    content = get_person_dossier_markdown(person_id)
+    return Response(content=content, media_type="text/markdown")

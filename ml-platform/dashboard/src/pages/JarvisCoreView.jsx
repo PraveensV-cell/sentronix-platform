@@ -15,7 +15,7 @@ export default function JarvisCoreView({ environment }) {
     const [loading, setLoading] = useState(true);
 
     // AI Configuration form
-    const [aiName, setAiName] = useState("JARVIS PRIME");
+    const [aiName, setAiName] = useState("VANTEP AI");
     const [speedMode, setSpeedMode] = useState("HIGH_PRECISION");
     const [autonomyLevel, setAutonomyLevel] = useState("FULL_AUTONOMOUS");
     const [voiceEnabled, setVoiceEnabled] = useState(true);
@@ -37,7 +37,7 @@ export default function JarvisCoreView({ environment }) {
             if (statusRes.autonomy_level) setAutonomyLevel(statusRes.autonomy_level);
             if (statusRes.voice_announcements !== undefined) setVoiceEnabled(statusRes.voice_announcements);
         } catch (err) {
-            console.error("Error loading JARVIS brain data", err);
+            console.error("Error loading VANTEP brain data", err);
         } finally {
             setLoading(false);
         }
@@ -151,14 +151,14 @@ export default function JarvisCoreView({ environment }) {
                     <div>
                         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                             <h2 style={{ margin: 0, fontSize: "22px", fontWeight: 800, letterSpacing: "1px", color: "#f8fafc" }}>
-                                {aiStatus?.name || "JARVIS PRIME"} — 24/7 AUTONOMOUS COMMAND BRAIN
+                                {aiStatus?.name || "VANTEP AI"} — 24/7 AUTONOMOUS COMMAND BRAIN
                             </h2>
                             <span style={{ fontSize: "11px", background: "#10b981", color: "#ffffff", padding: "2px 10px", borderRadius: "12px", fontWeight: 700 }}>
                                 24/7 ONLINE
                             </span>
                         </div>
                         <p style={{ margin: "4px 0 0 0", fontSize: "13px", color: "#94a3b8" }}>
-                            Master Artificial Intelligence Operations Commander • Institutional Surveillance &amp; Safety Hub
+                            Autonomous Intelligence Supervisor (JARVIS Series Architecture) • Institutional Surveillance &amp; Safety Hub
                         </p>
                     </div>
                 </div>
@@ -291,7 +291,7 @@ export default function JarvisCoreView({ environment }) {
                                     className="form-control"
                                     value={aiName}
                                     onChange={(e) => setAiName(e.target.value)}
-                                    placeholder="e.g. JARVIS PRIME, ATHENA, SENTRONIX"
+                                    placeholder="e.g. VANTEP AI, ATHENA, SENTRONIX"
                                     style={{ width: "100%", padding: "10px 12px", fontSize: "13px", borderRadius: "6px", border: "1px solid var(--border-color)" }}
                                 />
                             </div>

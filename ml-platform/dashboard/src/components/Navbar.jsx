@@ -35,7 +35,7 @@ export default function Navbar({
                 {/* System Telemetry Status */}
                 <div className={`status-pill ${systemOnline ? "online" : "offline"}`}>
                     <span className="status-dot"></span>
-                    <span>{systemOnline ? "24/7 AI ONLINE" : "SERVICES OFFLINE"}</span>
+                    <span>{systemOnline ? "VANTEP AI ONLINE" : "SERVICES OFFLINE"}</span>
                 </div>
 
                 {/* Quick Theme Toggle */}
@@ -49,19 +49,19 @@ export default function Navbar({
                     {themeMode === "dark" ? "☀️" : "🌙"}
                 </button>
 
-                {/* JARVIS AI Command Brain Button */}
+                {/* VANTEP AI Command Brain Button */}
                 <button
                     className="ai-assistant-toggle-btn"
                     onClick={onOpenJarvis}
                     style={{ background: "linear-gradient(135deg, #0ea5e9 0%, #0369a1 100%)", boxShadow: "0 2px 8px rgba(14,165,233,0.3)" }}
                 >
                     <span className="ai-spark-icon">🧠</span>
-                    <span>JARVIS BRAIN</span>
+                    <span>VANTEP BRAIN</span>
                 </button>
 
                 {/* AI Assistant Chat drawer */}
                 <button className="tool-btn btn-secondary-mini" onClick={onOpenAssistant} title="Open AI Assistant Drawer">
-                    <span>✨ Chat</span>
+                    <span>💬 Chat</span>
                 </button>
 
                 {/* Settings Shortcut */}
@@ -69,20 +69,33 @@ export default function Navbar({
                     <span>⚙️</span>
                 </button>
 
-                {/* User Profile */}
-                {user && (
-                    <div className="user-profile-badge" onClick={onOpenSettings} style={{ cursor: "pointer" }} title="Click to manage account">
-                        <div className="user-avatar">{(user.name || user.username).charAt(0).toUpperCase()}</div>
-                        <div className="user-details">
-                            <span className="user-name">{user.name || user.full_name || user.username}</span>
-                            <span className="user-role">{user.role?.toUpperCase()}</span>
-                        </div>
+                {/* User Session Dropdown / Logout */}
+                <div className="user-profile-badge">
+                    <div className="avatar-letter">
+                        {(user?.full_name || user?.name || user?.username || "A").charAt(0).toUpperCase()}
                     </div>
-                )}
-
-                <button className="logout-btn" onClick={onLogout} title="Sign Out">
-                    ⎋
-                </button>
+                    <div className="user-info-text">
+                        <span className="user-name">{user?.full_name || user?.username || "Administrator"}</span>
+                        <span className="user-role">{user?.role?.toUpperCase() || "ADMIN"}</span>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={onLogout}
+                        title="Sign Out"
+                        style={{
+                            background: "transparent",
+                            border: "none",
+                            color: "var(--danger-color)",
+                            fontSize: "12px",
+                            cursor: "pointer",
+                            padding: "2px 6px",
+                            fontWeight: 700,
+                            marginLeft: "6px",
+                        }}
+                    >
+                        Logout
+                    </button>
+                </div>
             </div>
         </header>
     );

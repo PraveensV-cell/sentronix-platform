@@ -411,4 +411,38 @@ export const uploadCameraFrame = async (cameraId: number | string, blob: Blob) =
     return res.data;
 };
 
+
+// ─── VANTEP AI Individual Folder & Document Management ──────────────────────
+export const getPersonFolder = async (personId: number) => {
+    const res = await API.get(`/people/${personId}/folder`);
+    return res.data;
+};
+
+export const uploadFileToPersonFolder = async (personId: number, file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    const res = await API.post(`/people/${personId}/folder/files`, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+    });
+    return res.data;
+};
+
+export const deleteFileFromPersonFolder = async (personId: number, filename: string) => {
+    const res = await API.delete(`/people/${personId}/folder/files/${filename}`);
+    return res.data;
+};
+
+export const getUnknownCaptures = async (envId: number = 1) => {
+    const res = await API.get(`/people/environment/${envId}/unknowns`);
+    return res.data;
+};
+
+export const getUnknownPhotoUrl = (envId: number, filename: string) => {
+    return `${API_BASE_URL}/people/environment/${envId}/unknowns/${filename}`;
+};
+
+export const getPersonFileUrl = (personId: number, filename: string) => {
+    return `${API_BASE_URL}/people/${personId}/folder/files/${filename}`;
+};
+
 export default API;

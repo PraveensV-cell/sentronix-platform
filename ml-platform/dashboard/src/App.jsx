@@ -188,6 +188,8 @@ export default function App() {
     return (
         <div
             className={`sentronix-app-root theme-${themeMode} font-${fontStyle} ${getModeClass()}`}
+            data-theme={themeMode}
+            data-mode={environment?.type || 'School'}
         >
             <Navbar
                 user={user}
