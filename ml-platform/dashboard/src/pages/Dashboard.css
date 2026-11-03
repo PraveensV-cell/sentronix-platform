@@ -1612,3 +1612,390 @@ input:focus, select:focus, textarea:focus {
     border: 1px solid rgba(203, 213, 225, 0.20);
     color: #ffffff;
 }
+
+/* ==========================================================================
+   MODE-SPECIFIC SIDEBAR PANELS & WIDGETS (STRICT 2D DEPTH)
+   ========================================================================== */
+
+.mode-panel-card {
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 14px;
+    transition: all 0.2s ease;
+}
+
+/* ── 1. ACADEMIC PANEL (CAMPUS & SCHOOL MODE) ────────────────────────────── */
+[data-theme="light"] .academic-panel {
+    background: #ffffff;
+    border: 2px solid #e2e8f0;
+    border-top: 4px solid #dc2626;
+    box-shadow: 2px 2px 0px rgba(220, 38, 38, 0.15);
+    color: #0a0a0a;
+}
+
+[data-theme="dark"] .academic-panel {
+    background: #0d1b32;
+    border: 2px solid rgba(212, 175, 55, 0.40);
+    border-top: 4px solid #ffd700;
+    box-shadow: 2px 2px 0px rgba(212, 175, 55, 0.20);
+    color: #ffffff;
+}
+
+.people-roster-scroll {
+    max-height: 280px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 12px 0;
+}
+
+.roster-person-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: 6px;
+    transition: background 0.15s;
+}
+
+[data-theme="light"] .roster-person-item {
+    background: #f8fafc;
+    border: 1px solid #cbd5e1;
+}
+
+[data-theme="dark"] .roster-person-item {
+    background: #081224;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.person-avatar-circle {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: #d4af37;
+    color: #0a0a0a;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    flex-shrink: 0;
+}
+
+.person-info-block {
+    flex: 1;
+    min-width: 0;
+}
+
+.person-info-block strong {
+    display: block;
+    font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.person-sub-info {
+    font-size: 10px;
+    color: var(--text-muted);
+}
+
+.attendance-status-chip {
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+}
+
+.attendance-status-chip.present {
+    background: rgba(16, 185, 129, 0.15);
+    color: #10b981;
+    border: 1px solid #10b981;
+}
+
+.attendance-status-chip.absent {
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+    border: 1px solid #ef4444;
+}
+
+.compliance-summary-box {
+    margin-top: 12px;
+    padding: 10px 12px;
+    border-radius: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 11px;
+}
+
+[data-theme="light"] .compliance-summary-box {
+    background: #f1f5f9;
+    border: 1px solid #cbd5e1;
+}
+
+[data-theme="dark"] .compliance-summary-box {
+    background: #060d1a;
+    border: 1px solid rgba(212, 175, 55, 0.25);
+}
+
+.compliance-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* ── 2. MILITARY PANEL (MILITARY & DEFENCE MODE) ─────────────────────────── */
+[data-theme="light"] .military-panel {
+    background: #f0fdf4;
+    border: 2px solid #86efac;
+    border-top: 4px solid #166534;
+    box-shadow: 2px 2px 0px rgba(22, 101, 52, 0.20);
+    color: #0a0a0a;
+}
+
+[data-theme="dark"] .military-panel {
+    background: #050e18;
+    border: 2px solid rgba(16, 185, 129, 0.40);
+    border-top: 4px solid #10b981;
+    box-shadow: 2px 2px 0px rgba(16, 185, 129, 0.20);
+    color: #ffffff;
+}
+
+.tactical-metrics-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin: 12px 0;
+}
+
+.tactical-cell {
+    padding: 8px 10px;
+    border-radius: 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    font-family: monospace, monospace;
+}
+
+[data-theme="light"] .tactical-cell {
+    background: #ffffff;
+    border: 1px solid #bbf7d0;
+}
+
+[data-theme="dark"] .tactical-cell {
+    background: #081628;
+    border: 1px solid rgba(16, 185, 129, 0.30);
+}
+
+.tactical-cell .t-label {
+    font-size: 9px;
+    color: var(--text-muted);
+    font-weight: 700;
+}
+
+.tactical-cell .t-val {
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.clearance-tiers-box {
+    margin-top: 10px;
+    padding: 10px 12px;
+    border-radius: 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    font-size: 11px;
+}
+
+[data-theme="light"] .clearance-tiers-box {
+    background: #ffffff;
+    border: 1px solid #86efac;
+}
+
+[data-theme="dark"] .clearance-tiers-box {
+    background: #081426;
+    border: 1px solid rgba(212, 175, 55, 0.30);
+}
+
+.tier-header {
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+}
+
+.tier-item {
+    font-size: 11px;
+    font-weight: 600;
+}
+
+/* ── 3. PUBLIC PLACES & GOVT PANEL (mode-layout-hospital) ─────────────────── */
+[data-theme="light"] .hospital-panel {
+    background: #fff7ed;
+    border: 2px solid #fdba74;
+    border-top: 4px solid #ea580c;
+    box-shadow: 2px 2px 0px rgba(234, 88, 12, 0.18);
+    color: #0a0a0a;
+}
+
+[data-theme="dark"] .hospital-panel {
+    background: #14171e;
+    border: 2px solid rgba(212, 175, 55, 0.35);
+    border-top: 4px solid #d4af37;
+    box-shadow: 2px 2px 0px rgba(212, 175, 55, 0.20);
+    color: #ffffff;
+}
+
+.crowd-density-meter {
+    padding: 14px;
+    border-radius: 6px;
+    text-align: center;
+    margin: 12px 0;
+}
+
+[data-theme="light"] .crowd-density-meter {
+    background: #ffffff;
+    border: 1px solid #fed7aa;
+}
+
+[data-theme="dark"] .crowd-density-meter {
+    background: #1a1e27;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.density-val-large {
+    font-size: 32px;
+    font-weight: 900;
+    color: #ea580c;
+}
+
+[data-theme="dark"] .density-val-large {
+    color: #d4af37;
+}
+
+.density-sub {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+.transit-zones-box {
+    margin-top: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 11px;
+}
+
+.zone-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 10px;
+    border-radius: 4px;
+}
+
+[data-theme="light"] .zone-row {
+    background: #ffffff;
+    border: 1px solid #fed7aa;
+}
+
+[data-theme="dark"] .zone-row {
+    background: #1a1f2b;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* ── 4. OFFICE & INDUSTRIES PANEL (mode-layout-industry) ─────────────────── */
+[data-theme="light"] .industry-panel {
+    background: #f8fafc;
+    border: 2px solid #cbd5e1;
+    border-top: 4px solid #d97706;
+    box-shadow: 2px 2px 0px rgba(217, 119, 6, 0.18);
+    color: #0a0a0a;
+}
+
+[data-theme="dark"] .industry-panel {
+    background: #0b111e;
+    border: 2px solid rgba(6, 182, 212, 0.40);
+    border-top: 4px solid #06b6d4;
+    box-shadow: 2px 2px 0px rgba(6, 182, 212, 0.20);
+    color: #ffffff;
+}
+
+.ppe-bars-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin: 12px 0;
+}
+
+.ppe-bar-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.ppe-bar-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.progress-bar-track {
+    width: 100%;
+    height: 8px;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+[data-theme="light"] .progress-bar-track {
+    background: #e2e8f0;
+}
+
+[data-theme="dark"] .progress-bar-track {
+    background: #172338;
+}
+
+.progress-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+}
+
+[data-theme="light"] .progress-bar-fill {
+    background: #d97706;
+}
+
+[data-theme="dark"] .progress-bar-fill {
+    background: #06b6d4;
+}
+
+.machine-tripwire-box {
+    margin-top: 10px;
+    padding: 10px 12px;
+    border-radius: 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 11px;
+}
+
+[data-theme="light"] .machine-tripwire-box {
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+}
+
+[data-theme="dark"] .machine-tripwire-box {
+    background: #111b2e;
+    border: 1px solid rgba(6, 182, 212, 0.30);
+}
+
+.machine-status-row {
+    font-size: 11px;
+    font-weight: 600;
+}

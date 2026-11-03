@@ -1,8 +1,19 @@
 import { useState } from "react";
 import { loginUser, registerUser } from "../api/api";
+import "./AuthPage.css";
 
 export default function AuthPage({ onAuthenticated }) {
     const [mode, setMode] = useState("login"); // 'login' | 'register'
+
+    // Theme toggle right on Auth Page
+    const [theme, setTheme] = useState(() => localStorage.getItem("sentronix_theme") || "dark");
+
+    const toggleTheme = () => {
+        const next = theme === "dark" ? "light" : "dark";
+        setTheme(next);
+        localStorage.setItem("sentronix_theme", next);
+        document.documentElement.setAttribute("data-theme", next);
+    };
 
     // Login fields (User ID, Email, Phone, Username + Password - NO OTP)
     const [identifier, setIdentifier] = useState("");
@@ -86,7 +97,27 @@ export default function AuthPage({ onAuthenticated }) {
     };
 
     return (
-        <div className="auth-container">
+        <div className={`auth-container theme-${theme}`} data-theme={theme}>
+            {/* Theme Toggle in top-right */}
+            <div style={{ position: "absolute", top: "20px", right: "24px" }}>
+                <button
+                    type="button"
+                    onClick={toggleTheme}
+                    style={{
+                        background: theme === "dark" ? "#111a2d" : "#ffffff",
+                        color: theme === "dark" ? "#ffd700" : "#dc2626",
+                        border: `1px solid ${theme === "dark" ? "#d4af37" : "#cbd5e1"}`,
+                        padding: "6px 14px",
+                        borderRadius: "20px",
+                        fontSize: "12px",
+                        fontWeight: 700,
+                        cursor: "pointer",
+                    }}
+                >
+                    {theme === "dark" ? "☀️ Light Mode" : "🌙 Dark Mode"}
+                </button>
+            </div>
+
             <div className="auth-card">
                 {/* Header */}
                 <div className="auth-header">
@@ -95,22 +126,7 @@ export default function AuthPage({ onAuthenticated }) {
                     </div>
                     <h1>SENTRONIX AI</h1>
                     <p>Intelligent 24/7 Multi-Model Autonomous Surveillance Platform</p>
-                    <div
-                        style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: "6px",
-                            marginTop: "8px",
-                            padding: "4px 12px",
-                            background: "rgba(212, 175, 55, 0.12)",
-                            border: "1px solid rgba(212, 175, 55, 0.40)",
-                            borderRadius: "16px",
-                            fontSize: "11px",
-                            color: "#d4af37",
-                            fontWeight: 700,
-                            letterSpacing: "0.5px",
-                        }}
-                    >
+                    <div className="vantep-badge-pill">
                         <span>🤖</span> VANTEP AI SUPERVISOR ACTIVE
                     </div>
                 </div>
@@ -148,7 +164,7 @@ export default function AuthPage({ onAuthenticated }) {
                             <label>User ID, Email, Phone, or Username *</label>
                             <input
                                 type="text"
-                                placeholder="Enter your User ID, Email, or Phone"
+                                placeholder="Enter User ID, Email, or Phone"
                                 value={identifier}
                                 onChange={(e) => setIdentifier(e.target.value)}
                                 required
@@ -167,8 +183,8 @@ export default function AuthPage({ onAuthenticated }) {
                             />
                         </div>
 
-                        <div style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: "12px", display: "flex", alignItems: "center", gap: "6px" }}>
-                            <span>🔒</span> Direct secure credentials verification. No OTP required.
+                        <div className="auth-security-notice">
+                            <span>🔒</span> Direct secure credentials verification. Zero OTP required.
                         </div>
 
                         <button type="submit" className="auth-submit-btn" disabled={loading}>
@@ -191,7 +207,7 @@ export default function AuthPage({ onAuthenticated }) {
                             <label>User ID (Username) *</label>
                             <input
                                 type="text"
-                                placeholder="e.g. officer_01 or pravin"
+                                placeholder="e.g. PraveenSV or officer_01"
                                 value={regUsername}
                                 onChange={(e) => setRegUsername(e.target.value)}
                                 required
@@ -203,7 +219,7 @@ export default function AuthPage({ onAuthenticated }) {
                             <label>Full Name *</label>
                             <input
                                 type="text"
-                                placeholder="e.g. Pravin Kumar"
+                                placeholder="e.g. Praveen SV"
                                 value={regName}
                                 onChange={(e) => setRegName(e.target.value)}
                                 required
@@ -254,7 +270,7 @@ export default function AuthPage({ onAuthenticated }) {
                             </select>
                         </div>
 
-                        <div style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: "12px", display: "flex", alignItems: "center", gap: "6px" }}>
+                        <div className="auth-security-notice">
                             <span>🛡️</span> Zero OTP required. Instant account generation with biometric privileges.
                         </div>
 

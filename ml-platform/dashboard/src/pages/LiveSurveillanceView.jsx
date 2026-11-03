@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef, useMemo } from "react";
+import OnboardingFlowModal from "../components/OnboardingFlowModal";
 import {
     getCameras,
+    createCamera,
     getDetections,
     getAlerts,
     getPeople,
@@ -32,6 +34,13 @@ export default function LiveSurveillanceView({ environment, systemOnline }) {
     const [viewMode, setViewMode] = useState("focus");
     const [selectedSector, setSelectedSector] = useState("all");
     const [cameraSearchQuery, setCameraSearchQuery] = useState("");
+    const [showOnboardingModal, setShowOnboardingModal] = useState(false);
+    const [showAddCamModal, setShowAddCamModal] = useState(false);
+    const [newCamName, setNewCamName] = useState("");
+    const [newCamLoc, setNewCamLoc] = useState("");
+    const [newCamFunc, setNewCamFunc] = useState("DRESS_CODE");
+    const [newCamSrcType, setNewCamSrcType] = useState("webcam");
+    const [newCamSrcUrl, setNewCamSrcUrl] = useState("0");
     const [snapshotMsg, setSnapshotMsg] = useState("");
     const [cameraActive, setCameraActive] = useState(true);
     const [currentDetectionsCount, setCurrentDetectionsCount] = useState(1);
@@ -268,6 +277,11 @@ export default function LiveSurveillanceView({ environment, systemOnline }) {
                                         setDetectionLabel(`⚠️ Unknown ${g} — Unenrolled Individual`);
                                     }
 
+                                    if (!an.person_detected) {
+                                        setDetectionLabel("VANTEP AI • Optics Active • Scanning for Subject");
+                                        return;
+                                    }
+
                                     // Autonomous AI Real-Time Broadcast & Speech
                                     let broadcastText = "";
                                     if (proh.length > 0) {
@@ -466,7 +480,8 @@ export default function LiveSurveillanceView({ environment, systemOnline }) {
                             const cLower = (color || "").toLowerCase();
                             const isBright = ["#10b981", "#00e676", "#ffd700", "#d4af37", "#38bdf8", "#06b6d4", "#a3e635", "#fed7aa"].some(c => cLower.includes(c));
                             ctx.fillStyle = isBright ? "#000000" : "#ffffff";
-                            ctx.fillText(det.label || "detected", bx + 6, badgeY + 13);
+                            ctx.textBaseline = "middle";
+                            ctx.fillText(det.label || "detected", bx + 6, badgeY + badgeH / 2);
                         });
                     } else {
                         // ─── Standby Mode: Waiting silently for subject (Zero fake alerts) ───
@@ -642,6 +657,34 @@ export default function LiveSurveillanceView({ environment, systemOnline }) {
         }
     };
 
+    const handleCreateCamera = async (e) => {
+        if (e) e.preventDefault();
+        if (!newCamName.trim()) return;
+        try {
+            const envId = environment?.id || 1;
+            const res = await createCamera({
+                name: newCamName.trim(),
+                location: newCamLoc.trim() || "Main Sector",
+                assigned_function: newCamFunc,
+                source_type: newCamSrcType,
+                source_url: newCamSrcUrl,
+                environment_id: envId,
+                group_id: 1,
+            });
+            if (res.success && res.camera) {
+                setShowAddCamModal(false);
+                setNewCamName("");
+                setNewCamLoc("");
+                await loadData();
+                setSelectedCamera(res.camera);
+                setTriageToast(`✓ Camera "${res.camera.camera_name}" created & assigned to ${newCamFunc}!`);
+                setTimeout(() => setTriageToast(""), 4000);
+            }
+        } catch (err) {
+            alert("Could not register camera.");
+        }
+    };
+
     const handleSnapshot = () => {
         setSnapshotMsg("📸 High-Resolution Frame Captured & Archived to Evidence Vault");
         setTimeout(() => setSnapshotMsg(""), 3500);
@@ -748,6 +791,54 @@ export default function LiveSurveillanceView({ environment, systemOnline }) {
                             ✕ False Alarm
                         </button>
                     </div>
+                </div>
+            )}
+
+            {/* Initial Dataset & Camera Onboarding Banner if people < 3 */}
+            {people.length < 3 && (
+                <div
+                    style={{
+                        margin: "0 0 16px 0",
+                        padding: "14px 20px",
+                        background: "rgba(212, 175, 55, 0.12)",
+                        border: "2px solid #d4af37",
+                        borderRadius: "8px",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        gap: "14px",
+                        boxShadow: "2px 2px 0px rgba(212, 175, 55, 0.25)",
+                    }}
+                >
+                    <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                        <span style={{ fontSize: "28px" }}>🤖</span>
+                        <div>
+                            <strong style={{ fontSize: "14px", color: "var(--text-primary)" }}>
+                                VANTEP AI • Initial Setup Required ({people.length}/3 Enrolled)
+                            </strong>
+                            <div style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "2px" }}>
+                                Upload a personnel dataset or register at least 3 individual profiles with clear face photos, then assign your camera fleet functions.
+                            </div>
+                        </div>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => setShowOnboardingModal(true)}
+                        style={{
+                            background: "#d4af37",
+                            color: "#0a101d",
+                            padding: "10px 18px",
+                            borderRadius: "6px",
+                            border: "none",
+                            fontWeight: 800,
+                            fontSize: "12px",
+                            cursor: "pointer",
+                            whiteSpace: "nowrap",
+                            boxShadow: "0 2px 8px rgba(212, 175, 55, 0.35)",
+                        }}
+                    >
+                        🚀 Launch Dataset &amp; Camera Wizard →
+                    </button>
                 </div>
             )}
 
@@ -915,13 +1006,51 @@ export default function LiveSurveillanceView({ environment, systemOnline }) {
                     {/* Header Bar */}
                     <div className="stage-top-header">
                         <div>
-                            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                                <h2 className="stage-title">Live Vision Perception</h2>
-                                <span className="cam-chip-active">
-                                    CAM #{selectedCamera?.id || 1} • {selectedCamera?.camera_name || "Camera"}
-                                </span>
+                            <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+                                <h2 className="stage-title">Live AI Surveillance</h2>
+                                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                                    <select
+                                        value={selectedCamera?.id || ""}
+                                        onChange={(e) => {
+                                            const cam = cameras.find((c) => String(c.id) === String(e.target.value));
+                                            if (cam) setSelectedCamera(cam);
+                                        }}
+                                        style={{
+                                            padding: "4px 8px",
+                                            borderRadius: "6px",
+                                            border: "1px solid var(--border-color)",
+                                            background: "var(--card-bg)",
+                                            color: "var(--text-primary)",
+                                            fontSize: "12px",
+                                            fontWeight: 700,
+                                        }}
+                                    >
+                                        {cameras.map((c) => (
+                                            <option key={c.id} value={c.id}>
+                                                CAM #{c.id} • {c.camera_name} [{c.assigned_function || "FACE_ATTENDANCE"}]
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowAddCamModal(true)}
+                                        style={{
+                                            background: "var(--primary-color)",
+                                            color: "#000000",
+                                            border: "none",
+                                            padding: "5px 10px",
+                                            borderRadius: "5px",
+                                            fontSize: "11px",
+                                            fontWeight: 800,
+                                            cursor: "pointer",
+                                        }}
+                                        title="Add another camera to this mode with a different function"
+                                    >
+                                        + Add Camera
+                                    </button>
+                                </div>
                             </div>
-                            <p className="stage-sub">📍 Sector: {selectedCamera?.location || "Gate Alpha"}</p>
+                            <p className="stage-sub">📍 Camera: {selectedCamera?.camera_name || "test camera 01"} • Location: {selectedCamera?.location || "Gate Alpha"}</p>
                         </div>
                         <div className="stage-header-actions">
                             <button
@@ -1120,6 +1249,50 @@ export default function LiveSurveillanceView({ environment, systemOnline }) {
 
                 {/* ── DISTINCT MODE-SPECIFIC RIGHT SIDEBAR PANELS (Point 3) ── */}
                 <div className="surveillance-right-sidebar">
+                    {/* Reference Image 2: Current State Telemetry Card */}
+                    <div
+                        className="current-state-card"
+                        style={{
+                            padding: "14px",
+                            background: "var(--card-bg)",
+                            border: "1px solid var(--border-color)",
+                            borderRadius: "8px",
+                            marginBottom: "14px",
+                            boxShadow: "var(--card-shadow)",
+                        }}
+                    >
+                        <div style={{ fontWeight: 800, fontSize: "13px", marginBottom: "10px", color: "var(--text-primary)" }}>
+                            Current state
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px", fontSize: "12px" }}>
+                            <span style={{ color: "var(--text-muted)" }}>Connection</span>
+                            <span style={{ display: "flex", alignItems: "center", gap: "6px", fontWeight: 700, color: cameraActive ? "#10b981" : "#f59e0b" }}>
+                                <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: cameraActive ? "#10b981" : "#f59e0b" }}></span>
+                                {cameraActive ? "ACTIVE" : "STANDBY"}
+                            </span>
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px", fontSize: "12px" }}>
+                            <span style={{ color: "var(--text-muted)" }}>Recording</span>
+                            <span style={{ display: "flex", alignItems: "center", gap: "6px", fontWeight: 700, color: "#38bdf8" }}>
+                                <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#38bdf8" }}></span>
+                                NOT CONFIGURED
+                            </span>
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px", fontSize: "12px" }}>
+                            <span style={{ color: "var(--text-muted)" }}>AI analysis</span>
+                            <span style={{ display: "flex", alignItems: "center", gap: "6px", fontWeight: 700, color: "#10b981" }}>
+                                <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#10b981" }}></span>
+                                ENABLED
+                            </span>
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "12px" }}>
+                            <span style={{ color: "var(--text-muted)" }}>Current detections</span>
+                            <span style={{ display: "flex", alignItems: "center", gap: "6px", fontWeight: 700, color: (livePerception.detections?.length || 0) > 0 ? "#10b981" : "#f59e0b" }}>
+                                <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: (livePerception.detections?.length || 0) > 0 ? "#10b981" : "#f59e0b" }}></span>
+                                {livePerception.detections?.length || 0}
+                            </span>
+                        </div>
+                    </div>
                     {/* Academic Campus Mode Sidebar Panel */}
                     {modeType === "School" && (
                         <div className="mode-panel-card academic-panel">
@@ -1379,6 +1552,68 @@ export default function LiveSurveillanceView({ environment, systemOnline }) {
                     </div>
                 </div>
             </div>
+            {/* Setup Wizard Modal */}
+            {showOnboardingModal && (
+                <OnboardingFlowModal
+                    environment={environment}
+                    isOpen={showOnboardingModal}
+                    onClose={() => setShowOnboardingModal(false)}
+                    onComplete={() => {
+                        setShowOnboardingModal(false);
+                        loadData();
+                    }}
+                />
+            )}
+
+            {/* Add Camera Modal */}
+            {showAddCamModal && (
+                <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 10001, display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }}>
+                    <div style={{ background: "var(--card-bg)", border: "2px solid var(--royal-gold)", borderRadius: "8px", padding: "24px", width: "100%", maxWidth: "460px", boxShadow: "0 12px 32px rgba(0,0,0,0.6)" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", borderBottom: "1px solid var(--border-color)", paddingBottom: "10px" }}>
+                            <h3 style={{ margin: 0, fontSize: "16px", color: "var(--text-primary)" }}>📹 Add Camera with Specific Function</h3>
+                            <button type="button" onClick={() => setShowAddCamModal(false)} style={{ background: "transparent", border: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: "16px" }}>✕</button>
+                        </div>
+                        <form onSubmit={handleCreateCamera} style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                            <div>
+                                <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "var(--text-muted)", marginBottom: "4px" }}>Camera Name *</label>
+                                <input type="text" value={newCamName} onChange={(e) => setNewCamName(e.target.value)} placeholder="e.g. CAM-02 [Exam Hall East]" required style={{ width: "100%", padding: "8px 10px", borderRadius: "4px", border: "1px solid var(--border-color)", background: "var(--bg-secondary)", color: "var(--text-primary)", fontSize: "12px" }} />
+                            </div>
+                            <div>
+                                <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "var(--text-muted)", marginBottom: "4px" }}>Location Sector</label>
+                                <input type="text" value={newCamLoc} onChange={(e) => setNewCamLoc(e.target.value)} placeholder="e.g. Block B, 2nd Floor Corridor" style={{ width: "100%", padding: "8px 10px", borderRadius: "4px", border: "1px solid var(--border-color)", background: "var(--bg-secondary)", color: "var(--text-primary)", fontSize: "12px" }} />
+                            </div>
+                            <div>
+                                <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "var(--text-muted)", marginBottom: "4px" }}>Signal Source Type</label>
+                                <select value={newCamSrcType} onChange={(e) => setNewCamSrcType(e.target.value)} style={{ width: "100%", padding: "8px 10px", borderRadius: "4px", border: "1px solid var(--border-color)", background: "var(--bg-secondary)", color: "var(--text-primary)", fontSize: "12px" }}>
+                                    <option value="webcam">Integrated Laptop Camera</option>
+                                    <option value="usb_port">External USB Video Device</option>
+                                    <option value="mobile_ip">Mobile Phone / Remote IP Stream</option>
+                                    <option value="rtsp">CCTV RTSP Network Stream</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "var(--text-muted)", marginBottom: "4px" }}>Hardware Port / URL</label>
+                                <input type="text" value={newCamSrcUrl} onChange={(e) => setNewCamSrcUrl(e.target.value)} placeholder="0 for webcam, or rtsp://..." style={{ width: "100%", padding: "8px 10px", borderRadius: "4px", border: "1px solid var(--border-color)", background: "var(--bg-secondary)", color: "var(--text-primary)", fontSize: "12px" }} />
+                            </div>
+                            <div>
+                                <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "var(--text-muted)", marginBottom: "4px" }}>Assigned Operational Function *</label>
+                                <select value={newCamFunc} onChange={(e) => setNewCamFunc(e.target.value)} style={{ width: "100%", padding: "8px 10px", borderRadius: "4px", border: "1px solid var(--border-color)", background: "var(--bg-secondary)", color: "var(--text-primary)", fontSize: "12px" }}>
+                                    <option value="DRESS_CODE">👔 Dress Code &amp; Uniform Verification (Pass/Violation)</option>
+                                    <option value="FACE_ATTENDANCE">🎓 Face Biometric Attendance &amp; Check-In</option>
+                                    <option value="SAFETY">🦺 OSHA Safety Gear (Hardhat, High-Vis Vest, Goggles)</option>
+                                    <option value="EXAM_MONITOR">📝 Exam Proctoring (Cell Phones &amp; Malpractice)</option>
+                                    <option value="PERIMETER_INTRUSION">🛡️ Tactical Perimeter &amp; Intrusion Tripwire</option>
+                                    <option value="CROWD_LOITERING">👥 Crowd Density &amp; Transit Loitering</option>
+                                </select>
+                            </div>
+                            <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px", marginTop: "10px" }}>
+                                <button type="button" onClick={() => setShowAddCamModal(false)} style={{ background: "transparent", border: "1px solid var(--border-color)", padding: "7px 14px", borderRadius: "4px", fontSize: "12px", color: "var(--text-muted)", cursor: "pointer" }}>Cancel</button>
+                                <button type="submit" style={{ background: "var(--royal-gold)", color: "#0a101d", padding: "7px 18px", borderRadius: "4px", fontSize: "12px", fontWeight: 800, border: "none", cursor: "pointer" }}>Register Camera</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

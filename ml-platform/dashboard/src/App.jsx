@@ -164,7 +164,7 @@ export default function App() {
     // Flow Step 1: Authentication required (User ID, name, email, phone, password - NO OTP)
     if (!user) {
         return (
-            <div className={`theme-${themeMode} font-${fontStyle}`}>
+            <div className={`theme-${themeMode} font-${fontStyle}`} data-theme={themeMode}>
                 <AuthPage onAuthenticated={handleAuthenticated} />
             </div>
         );
@@ -173,7 +173,7 @@ export default function App() {
     // Flow Step 2: Operational Mode selection required (Points 2 & 3)
     if (!environment) {
         return (
-            <div className={`theme-${themeMode} font-${fontStyle}`}>
+            <div className={`theme-${themeMode} font-${fontStyle}`} data-theme={themeMode}>
                 <EnvironmentSelectPage
                     user={user}
                     onEnvironmentSelected={handleEnvironmentSelected}
