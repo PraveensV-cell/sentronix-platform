@@ -8,7 +8,7 @@ import {
     logAIAction,
 } from "../api/api";
 
-export default function JarvisCoreView({ environment }) {
+export default function VANTEPCoreView({ environment }) {
     const [aiStatus, setAiStatus] = useState(null);
     const [dailyLog, setDailyLog] = useState(null);
     const [actions, setActions] = useState([]);
@@ -158,7 +158,7 @@ export default function JarvisCoreView({ environment }) {
                             </span>
                         </div>
                         <p style={{ margin: "4px 0 0 0", fontSize: "13px", color: "#94a3b8" }}>
-                            Autonomous Intelligence Supervisor (JARVIS Series Architecture) • Institutional Surveillance &amp; Safety Hub
+                            Autonomous Intelligence Supervisor (VANTEP Series Architecture) • Institutional Surveillance &amp; Safety Hub
                         </p>
                     </div>
                 </div>
@@ -333,7 +333,7 @@ export default function JarvisCoreView({ environment }) {
                                     style={{ width: "16px", height: "16px", cursor: "pointer" }}
                                 />
                                 <label htmlFor="voiceToggle" style={{ fontSize: "13px", cursor: "pointer", fontWeight: 600 }}>
-                                    Enable Audio Voice Announcements (JARVIS Speech)
+                                    Enable Audio Voice Announcements (VANTEP Speech)
                                 </label>
                             </div>
 
@@ -358,7 +358,7 @@ export default function JarvisCoreView({ environment }) {
                                 📁 AI Daily Surveillance Work File: <code>ai_work_log_{new Date().toISOString().slice(0, 10)}.json</code>
                             </h3>
                             <p style={{ margin: "4px 0 0 0", fontSize: "12px", color: "var(--text-secondary)" }}>
-                                Automatically compiled, formatted, and persisted on disk by {aiStatus?.name || "JARVIS"}.
+                                Automatically compiled, formatted, and persisted on disk by {aiStatus?.name || "VANTEP"}.
                             </p>
                         </div>
                         <button

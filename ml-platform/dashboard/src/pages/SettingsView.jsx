@@ -241,10 +241,10 @@ export default function SettingsView({
                         </div>
                     </div>
 
-                    {/* Audio & JARVIS Voice Card */}
+                    {/* Audio & VANTEP Voice Card */}
                     <div className="cam-card" style={{ padding: "22px" }}>
                         <h4 style={{ margin: "0 0 4px 0", fontSize: "15px", fontWeight: 700 }}>
-                            🔊 JARVIS Spoken Audio Announcements
+                            🔊 VANTEP Spoken Audio Announcements
                         </h4>
                         <p style={{ margin: "0 0 16px 0", fontSize: "12px", color: "var(--text-secondary)" }}>
                             Enable real-time voice speech synthesis for verified attendances and alerts.

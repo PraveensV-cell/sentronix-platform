@@ -451,21 +451,22 @@ export default function LiveSurveillanceView({ environment, systemOnline }) {
                                 ctx.stroke();
                             }
 
-                            // 3. Label Badge on top-left of box (matching Reference Image 1 & 2)
+                            // 3. Label Badge on top-left edge of box (matching Reference Images 1 & 2)
                             ctx.font = "bold 11px 'Inter', sans-serif";
                             const textMetrics = ctx.measureText(det.label || "detected");
-                            const badgeW = textMetrics.width + 14;
-                            const badgeH = 20;
-                            const badgeY = by >= badgeH + 4 ? by - badgeH - 2 : by + 2;
+                            const badgeW = textMetrics.width + 12;
+                            const badgeH = 18;
+                            const badgeY = by >= badgeH ? by - badgeH : by;
 
-                            ctx.fillStyle = "rgba(10, 16, 26, 0.94)";
-                            ctx.fillRect(bx, badgeY, badgeW, badgeH);
-                            ctx.lineWidth = 1;
-                            ctx.strokeStyle = color;
-                            ctx.strokeRect(bx, badgeY, badgeW, badgeH);
-
+                            // Solid badge background fill matching box color exactly (Image 1 & 2)
                             ctx.fillStyle = color;
-                            ctx.fillText(det.label || "detected", bx + 6, badgeY + 14);
+                            ctx.fillRect(bx, badgeY, badgeW, badgeH);
+
+                            // Crisp high-contrast text: black on bright fills, white on dark/red fills
+                            const cLower = (color || "").toLowerCase();
+                            const isBright = ["#10b981", "#00e676", "#ffd700", "#d4af37", "#38bdf8", "#06b6d4", "#a3e635", "#fed7aa"].some(c => cLower.includes(c));
+                            ctx.fillStyle = isBright ? "#000000" : "#ffffff";
+                            ctx.fillText(det.label || "detected", bx + 6, badgeY + 13);
                         });
                     } else {
                         // ─── Standby Mode: Waiting silently for subject (Zero fake alerts) ───
@@ -883,7 +884,7 @@ export default function LiveSurveillanceView({ environment, systemOnline }) {
                     <div className="ai-crest-icon">⚜️</div>
                     <div>
                         <div className="ai-sub-tag">
-                            JARVIS 24/7 PERCEPTION STREAM • {recentAction.timestamp}
+                            VANTEP 24/7 PERCEPTION STREAM • {recentAction.timestamp}
                         </div>
                         <div className="ai-text-line">{recentAction.text}</div>
                     </div>

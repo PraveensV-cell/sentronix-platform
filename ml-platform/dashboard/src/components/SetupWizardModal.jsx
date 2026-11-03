@@ -510,7 +510,7 @@ export default function SetupWizardModal({ environment, isOpen, onClose, onCompl
                                     Fleet Scale Ready
                                 </div>
                                 <div style={{ fontSize: "12px", marginTop: "4px" }}>
-                                    ✅ This camera will be added to your operational fleet of <strong>70–80 institution cameras</strong> managed by JARVIS AI.
+                                    ✅ This camera will be added to your operational fleet of <strong>70–80 institution cameras</strong> managed by VANTEP AI.
                                 </div>
                             </div>
                         </div>

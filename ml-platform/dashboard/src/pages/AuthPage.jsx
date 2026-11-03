@@ -1,87 +1,84 @@
 import { useState } from "react";
 import { loginUser, registerUser } from "../api/api";
 
-// ─── Demo Profiles for quick testing ────────────────────────────────────────
-const DEMO_PROFILES = [
-    { label: "Admin",    identifier: "admin",    password: "admin123" },
-    { label: "Operator", identifier: "operator", password: "admin123" },
-    { label: "Analyst",  identifier: "analyst",  password: "admin123" },
-];
-
 export default function AuthPage({ onAuthenticated }) {
-    const [mode, setMode] = useState("login");   // 'login' | 'register'
+    const [mode, setMode] = useState("login"); // 'login' | 'register'
 
-    // Login fields
+    // Login fields (User ID, Email, Phone, Username + Password - NO OTP)
     const [identifier, setIdentifier] = useState("");
-    const [password, setPassword]     = useState("");
+    const [password, setPassword] = useState("");
 
-    // Register fields: ID, Name, Phone, Email, Password (NO OTP)
+    // Register fields (User ID, Email, Phone, Username + Password - NO OTP)
     const [regUsername, setRegUsername] = useState("");
-    const [regName,     setRegName]     = useState("");
-    const [regPhone,    setRegPhone]    = useState("");
-    const [regEmail,    setRegEmail]    = useState("");
+    const [regName, setRegName] = useState("");
+    const [regPhone, setRegPhone] = useState("");
+    const [regEmail, setRegEmail] = useState("");
     const [regPassword, setRegPassword] = useState("");
-    const [regRole,     setRegRole]     = useState("operator");
+    const [regRole, setRegRole] = useState("operator");
 
-    const [error,   setError]   = useState("");
+    const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
 
     // ── Login ──────────────────────────────────────────────────────────────
-    const handleLogin = async (e, customId, customPw) => {
+    const handleLogin = async (e) => {
         if (e) e.preventDefault();
         setError("");
+        if (!identifier.trim() || !password.trim()) {
+            setError("Please enter your User ID, Email, Phone, or Username along with your Password.");
+            return;
+        }
         setLoading(true);
         try {
             const res = await loginUser({
-                identifier: customId || identifier,
-                password:   customPw  || password,
+                identifier: identifier.trim(),
+                password: password.trim(),
             });
             if (res.success && res.access_token) {
                 localStorage.setItem("sentronix_token", res.access_token);
-                localStorage.setItem("sentronix_user",  JSON.stringify(res.user));
+                localStorage.setItem("sentronix_user", JSON.stringify(res.user));
                 onAuthenticated(res.user);
             } else {
-                setError(res.detail || "Authentication failed");
+                setError(res.detail || "Authentication failed. Check your credentials.");
             }
         } catch (err) {
             setError(
                 err.response?.data?.detail ||
-                "Invalid credentials or backend unavailable"
+                "Invalid credentials or backend unavailable. Check server connection."
             );
         } finally {
             setLoading(false);
         }
     };
 
-    // ── Register (No OTP) ───────────────────────────────────────────────────
+    // ── Register (No OTP Required) ──────────────────────────────────────────
     const handleRegister = async (e) => {
-        e.preventDefault();
+        if (e) e.preventDefault();
         setError("");
-        if (!regUsername || !regName || !regPhone || !regEmail || !regPassword) {
-            setError("All fields (User ID, Full Name, Phone, Email, and Password) are required.");
+        if (!regUsername.trim() || !regName.trim() || !regPhone.trim() || !regEmail.trim() || !regPassword.trim()) {
+            setError("All fields (User ID, Full Name, Phone, Email, and Password) are strictly required.");
             return;
         }
         setLoading(true);
         try {
             const res = await registerUser({
-                username: regUsername,
-                name:     regName,
-                phone:    regPhone,
-                email:    regEmail,
-                password: regPassword,
-                role:     regRole,
+                username: regUsername.trim(),
+                name: regName.trim(),
+                phone: regPhone.trim(),
+                email: regEmail.trim(),
+                password: regPassword.trim(),
+                role: regRole,
             });
             if (res.success && res.access_token) {
                 localStorage.setItem("sentronix_token", res.access_token);
-                localStorage.setItem("sentronix_user",  JSON.stringify(res.user));
+                localStorage.setItem("sentronix_user", JSON.stringify(res.user));
                 onAuthenticated(res.user);
             } else {
-                setError(res.detail || "Registration failed");
+                setError(res.detail || "Registration failed.");
             }
         } catch (err) {
             setError(
                 err.response?.data?.detail ||
-                "Registration failed. Username, email or phone may already be registered."
+                "Registration failed. User ID, Email, or Phone may already be registered."
             );
         } finally {
             setLoading(false);
@@ -91,14 +88,31 @@ export default function AuthPage({ onAuthenticated }) {
     return (
         <div className="auth-container">
             <div className="auth-card">
-
                 {/* Header */}
                 <div className="auth-header">
                     <div className="brand-logo-icon large">
                         <div className="inner-radar"></div>
                     </div>
                     <h1>SENTRONIX AI</h1>
-                    <p>Intelligent 24/7 Surveillance &amp; Safety Platform</p>
+                    <p>Intelligent 24/7 Multi-Model Autonomous Surveillance Platform</p>
+                    <div
+                        style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "6px",
+                            marginTop: "8px",
+                            padding: "4px 12px",
+                            background: "rgba(212, 175, 55, 0.12)",
+                            border: "1px solid rgba(212, 175, 55, 0.40)",
+                            borderRadius: "16px",
+                            fontSize: "11px",
+                            color: "#d4af37",
+                            fontWeight: 700,
+                            letterSpacing: "0.5px",
+                        }}
+                    >
+                        <span>🤖</span> VANTEP AI SUPERVISOR ACTIVE
+                    </div>
                 </div>
 
                 {/* Tab Switcher */}
@@ -131,10 +145,10 @@ export default function AuthPage({ onAuthenticated }) {
                 {mode === "login" && (
                     <form onSubmit={handleLogin} className="auth-form">
                         <div className="form-group">
-                            <label>User ID, Email, or Phone</label>
+                            <label>User ID, Email, Phone, or Username *</label>
                             <input
                                 type="text"
-                                placeholder="e.g. admin or 9876543210"
+                                placeholder="Enter your User ID, Email, or Phone"
                                 value={identifier}
                                 onChange={(e) => setIdentifier(e.target.value)}
                                 required
@@ -143,7 +157,7 @@ export default function AuthPage({ onAuthenticated }) {
                         </div>
 
                         <div className="form-group">
-                            <label>Password</label>
+                            <label>Password *</label>
                             <input
                                 type="password"
                                 placeholder="••••••••"
@@ -153,28 +167,13 @@ export default function AuthPage({ onAuthenticated }) {
                             />
                         </div>
 
+                        <div style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: "12px", display: "flex", alignItems: "center", gap: "6px" }}>
+                            <span>🔒</span> Direct secure credentials verification. No OTP required.
+                        </div>
+
                         <button type="submit" className="auth-submit-btn" disabled={loading}>
                             {loading ? "Authenticating..." : "Sign In to Platform →"}
                         </button>
-
-                        {/* Quick Demo Profiles */}
-                        <div className="demo-profiles-row">
-                            <span className="demo-label">Quick fill:</span>
-                            {DEMO_PROFILES.map((p) => (
-                                <button
-                                    key={p.label}
-                                    type="button"
-                                    className="demo-btn"
-                                    onClick={() => {
-                                        setIdentifier(p.identifier);
-                                        setPassword(p.password);
-                                        handleLogin(null, p.identifier, p.password);
-                                    }}
-                                >
-                                    {p.label}
-                                </button>
-                            ))}
-                        </div>
 
                         <div className="auth-footer-toggle">
                             Don&apos;t have an account?{" "}
@@ -204,7 +203,7 @@ export default function AuthPage({ onAuthenticated }) {
                             <label>Full Name *</label>
                             <input
                                 type="text"
-                                placeholder="e.g. Commander Pravin"
+                                placeholder="e.g. Pravin Kumar"
                                 value={regName}
                                 onChange={(e) => setRegName(e.target.value)}
                                 required
@@ -255,6 +254,10 @@ export default function AuthPage({ onAuthenticated }) {
                             </select>
                         </div>
 
+                        <div style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: "12px", display: "flex", alignItems: "center", gap: "6px" }}>
+                            <span>🛡️</span> Zero OTP required. Instant account generation with biometric privileges.
+                        </div>
+
                         <button type="submit" className="auth-submit-btn" disabled={loading}>
                             {loading ? "Creating Account..." : "Create Account & Enter Platform →"}
                         </button>
@@ -267,7 +270,6 @@ export default function AuthPage({ onAuthenticated }) {
                         </div>
                     </form>
                 )}
-
             </div>
         </div>
     );
