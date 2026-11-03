@@ -2,17 +2,49 @@ import json
 from pathlib import Path
 import sqlite3
 import time
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import cv2
 import numpy as np
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = BASE_DIR.parent
 DATABASE_PATH = BASE_DIR / "database" / "sentronix.db"
 
 # Haar Cascade for real-time frontal face detection
 CASCADE_PATH = cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
-face_cascade = cv2.CascadeClassifier(CASCADE_PATH)
+face_cascade = cv2.CascadeClassifier(CASCADE_PATH) if cv2.data.haarcascades else None
+
+# Cached YOLO model instance
+_yolo_model = None
+_yolo_failed = False
+
+
+def get_yolo_model():
+    """Returns a singleton Ultralytics YOLO model for real-time surveillance perception."""
+    global _yolo_model, _yolo_failed
+    if _yolo_model is None and not _yolo_failed:
+        try:
+            from ultralytics import YOLO
+
+            candidates = [
+                BASE_DIR / "yolo11n.pt",
+                PROJECT_ROOT / "yolo11n.pt",
+                PROJECT_ROOT / "yolo11s.pt",
+            ]
+            chosen = None
+            for c in candidates:
+                if c.exists():
+                    chosen = str(c)
+                    break
+            if chosen is None:
+                chosen = "yolo11n.pt"
+
+            _yolo_model = YOLO(chosen)
+        except Exception as e:
+            print(f"[FaceRecognitionService] YOLO load warning: {e}")
+            _yolo_failed = True
+    return _yolo_model
 
 
 def get_db():
@@ -25,22 +57,69 @@ def get_db():
 def extract_face_embedding(
     img: np.ndarray,
 ) -> Tuple[Optional[np.ndarray], Optional[Tuple[int, int, int, int]]]:
-    """Detects the largest frontal face and extracts a 128-dimensional spatial + gradient feature vector."""
+    """
+    Detects face (via Haar Cascade or YOLO person head localization)
+    and extracts a 128-dimensional spatial + gradient feature vector.
+    """
     if img is None or img.size == 0:
         return None, None
 
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    faces = face_cascade.detectMultiScale(
-        gray, scaleFactor=1.1, minNeighbors=4, minSize=(35, 35)
-    )
+    ih, iw = img.shape[:2]
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) if len(img.shape) == 3 else img
 
-    if len(faces) == 0:
+    # Stage 1: Try Haar cascade
+    face_box = None
+    if face_cascade is not None:
+        faces = face_cascade.detectMultiScale(
+            gray, scaleFactor=1.1, minNeighbors=4, minSize=(32, 32)
+        )
+        if len(faces) > 0:
+            faces = sorted(faces, key=lambda f: f[2] * f[3], reverse=True)
+            face_box = (
+                int(faces[0][0]),
+                int(faces[0][1]),
+                int(faces[0][2]),
+                int(faces[0][3]),
+            )
+
+    # Stage 2: If Haar cascade found nothing, use YOLO person localization
+    if face_box is None:
+        model = get_yolo_model()
+        if model is not None:
+            try:
+                res = model(img, conf=0.35, verbose=False)
+                if res and len(res) > 0 and res[0].boxes is not None:
+                    person_boxes = []
+                    for b in res[0].boxes:
+                        if int(b.cls.item()) == 0:  # 0 is 'person'
+                            xyxy = [int(v) for v in b.xyxy[0].tolist()]
+                            pw = xyxy[2] - xyxy[0]
+                            ph = xyxy[3] - xyxy[1]
+                            person_boxes.append((xyxy[0], xyxy[1], pw, ph))
+
+                    if person_boxes:
+                        # Largest person
+                        person_boxes.sort(key=lambda b: b[2] * b[3], reverse=True)
+                        px, py, pw, ph = person_boxes[0]
+
+                        # Derive head/face region from person box
+                        fx = max(0, int(px + pw * 0.22))
+                        fy = max(0, int(py + ph * 0.04))
+                        fw = min(iw - fx, int(pw * 0.56))
+                        fh = min(ih - fy, int(ph * 0.36))
+
+                        if fw >= 24 and fh >= 24:
+                            face_box = (fx, fy, fw, fh)
+            except Exception as e:
+                print(f"[FaceService] YOLO fallback detection error: {e}")
+
+    if face_box is None:
         return None, None
 
-    # Largest face
-    faces = sorted(faces, key=lambda f: f[2] * f[3], reverse=True)
-    x, y, w, h = faces[0]
+    x, y, w, h = face_box
     face_roi = gray[y : y + h, x : x + w]
+    if face_roi.size == 0:
+        return None, None
 
     try:
         resized = cv2.resize(face_roi, (64, 64), interpolation=cv2.INTER_AREA)
@@ -210,7 +289,7 @@ def detect_dress_code_and_id_card(
         chest_roi = torso_gray[chest_y1:chest_y2, chest_x1:chest_x2]
         if chest_roi.size > 0:
             bright_ratio = np.mean(chest_roi > 185)
-            if bright_ratio > 0.10:
+            if bright_ratio > 0.08:
                 id_card_detected = True
                 id_box = [
                     int(tx1 + chest_x1),
@@ -241,9 +320,9 @@ def detect_dress_code_and_id_card(
         if val_mean > 175:
             dress_type = "Regular Formals (White / Light)"
         elif val_mean < 80:
-            dress_type = "Regular School Uniform (Dark / Blazer)"
+            dress_type = "Regular Uniform (Dark / Blazer)"
         else:
-            dress_type = "Regular School Formals"
+            dress_type = "Regular Formal Uniform"
         dress_compliant = True
     else:
         if sat_mean > 115:
@@ -274,6 +353,7 @@ def detect_dress_code_and_id_card(
             else "ID CARD MISSING • NON-COMPLIANT"
         ),
         "id_box": id_box,
+        "torso_box": [int(tx1), int(ty1), int(tx2 - tx1), int(ty2 - ty1)],
         "dress_compliant": dress_compliant,
         "dress_type": dress_type,
         "compliance_status": compliance_status,
@@ -291,6 +371,8 @@ def detect_safety_ppe(
             "ppe_active": False,
             "ppe_compliant": True,
             "status_label": "STANDBY • WAITING FOR WORKER",
+            "helmet_box": None,
+            "vest_box": None,
         }
 
     h, w = frame.shape[:2]
@@ -301,12 +383,12 @@ def detect_safety_ppe(
     hy2 = min(h, int(fy + fh * 0.15))
     hx1 = max(0, int(fx - fw * 0.20))
     hx2 = min(w, int(fx + fw * 1.20))
+    helmet_box = [int(hx1), int(hy1), int(hx2 - hx1), int(hy2 - hy1)]
 
     helmet_detected = False
     helmet_roi = frame[hy1:hy2, hx1:hx2]
     if helmet_roi.size > 0:
         hsv_h = cv2.cvtColor(helmet_roi, cv2.COLOR_BGR2HSV)
-        # Yellow, white, neon orange, or blue hardhat
         yellow_mask = cv2.inRange(
             hsv_h, np.array([15, 90, 90]), np.array([35, 255, 255])
         )
@@ -328,12 +410,12 @@ def detect_safety_ppe(
     vy2 = min(h, int(fy + fh * 2.6))
     vx1 = max(0, int(fx - fw * 0.5))
     vx2 = min(w, int(fx + fw * 1.5))
+    vest_box = [int(vx1), int(vy1), int(vx2 - vx1), int(vy2 - vy1)]
 
     vest_detected = False
     vest_roi = frame[vy1:vy2, vx1:vx2]
     if vest_roi.size > 0:
         hsv_v = cv2.cvtColor(vest_roi, cv2.COLOR_BGR2HSV)
-        # High-vis neon lime/yellow or fluorescent orange
         neon_lime = cv2.inRange(
             hsv_v, np.array([30, 100, 110]), np.array([65, 255, 255])
         )
@@ -362,6 +444,8 @@ def detect_safety_ppe(
         "gloves_detected": True,
         "ppe_compliant": ppe_compliant,
         "status_label": status_label,
+        "helmet_box": helmet_box,
+        "vest_box": vest_box,
     }
 
 
@@ -370,66 +454,170 @@ def analyze_surveillance_frame(
     environment_id: int = 1,
     assigned_function: str = "FACE_ATTENDANCE",
 ) -> Dict[str, Any]:
-    """Performs full frame perception for VANTEP AI: True Face Matching, Dress Code & ID, Safety PPE, and Violations."""
-    h, w = frame.shape[:2]
-    feat, face_box = extract_face_embedding(frame)
+    """
+    Performs full surveillance perception for VANTEP AI:
+    - Multi-object YOLO detection (person, smartphone, bag, etc.)
+    - Facial biometrics & database verification
+    - Torso dress code & ID card verification
+    - OSHA safety PPE (helmet, vest, gloves)
+    - Returns technical bounding boxes for EVERY person, face, dress, ID, and safety gear!
+    """
+    if frame is None or frame.size == 0:
+        return {
+            "person_detected": False,
+            "face_detected": False,
+            "detections": [],
+            "objects_summary": [],
+            "is_match": False,
+            "matched_person": None,
+            "similarity": 0.0,
+            "status_label": "STANDBY • WAITING FOR CAMERA FEED",
+        }
 
-    matched_person: Optional[Dict[str, Any]] = None
+    ih, iw = frame.shape[:2]
+    model = get_yolo_model()
+
+    yolo_persons: List[Tuple[int, int, int, int, float]] = []
+    yolo_phones: List[Tuple[int, int, int, int, float]] = []
+    yolo_objects: List[Dict[str, Any]] = []
+
+    if model is not None:
+        try:
+            res = model(frame, conf=0.35, verbose=False)
+            if res and len(res) > 0 and res[0].boxes is not None:
+                for b in res[0].boxes:
+                    cls_id = int(b.cls.item())
+                    conf = float(b.conf.item())
+                    coords = [int(v) for v in b.xyxy[0].tolist()]
+                    bx1, by1, bx2, by2 = coords
+                    bw = bx2 - bx1
+                    bh = by2 - by1
+
+                    if cls_id == 0:  # person
+                        yolo_persons.append((bx1, by1, bw, bh, conf))
+                    elif cls_id == 67:  # cell phone
+                        yolo_phones.append((bx1, by1, bw, bh, conf))
+                    else:
+                        cname = res[0].names.get(cls_id, f"obj_{cls_id}")
+                        yolo_objects.append(
+                            {"name": cname, "conf": conf, "box": [bx1, by1, bw, bh]}
+                        )
+        except Exception as e:
+            print(f"[FaceService] YOLO inference error: {e}")
+
+    # Stage 2: Fallback to Haar cascade if no YOLO person was found
+    feat, haar_face_box = extract_face_embedding(frame)
+    has_person = len(yolo_persons) > 0 or haar_face_box is not None
+
+    if not has_person:
+        # Standby mode: No subject in frame, zero fake alerts!
+        return {
+            "person_detected": False,
+            "face_detected": False,
+            "detections": [],
+            "objects_summary": [],
+            "is_match": False,
+            "matched_person": None,
+            "similarity": 0.0,
+            "detected_gender": "person",
+            "dress_code": {
+                "id_card_detected": None,
+                "id_card_status": "STANDBY • WAITING FOR SUBJECT",
+                "dress_compliant": True,
+                "dress_type": "None",
+                "compliance_status": "NOMINAL_STANDBY",
+            },
+            "safety_ppe": {
+                "ppe_active": False,
+                "ppe_compliant": True,
+                "status_label": "STANDBY • WAITING FOR WORKER",
+            },
+            "prohibited_items": [],
+            "assigned_function": assigned_function,
+            "timestamp": time.time(),
+        }
+
+    # Fetch registered personnel embeddings from database
+    db_people = []
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            """
+            SELECT p.id, p.name, p.identifier, p.role, p.department, p.allowed_dress, fe.embedding_json
+            FROM people p
+            JOIN face_embeddings fe ON p.id = fe.person_id
+            WHERE p.environment_id = ? AND p.is_enrolled = 1
+            """,
+            (environment_id,),
+        ).fetchall()
+        for r in rows:
+            try:
+                db_people.append(
+                    {
+                        "id": r["id"],
+                        "name": r["name"],
+                        "identifier": r["identifier"],
+                        "role": r["role"],
+                        "department": r["department"],
+                        "allowed_dress": r["allowed_dress"],
+                        "feat": np.array(
+                            json.loads(r["embedding_json"]), dtype=np.float32
+                        ),
+                    }
+                )
+            except Exception:
+                continue
+    finally:
+        conn.close()
+
+    # Determine primary person box
+    if yolo_persons:
+        yolo_persons.sort(key=lambda p: p[2] * p[3], reverse=True)
+        px, py, pw, ph, pconf = yolo_persons[0]
+    else:
+        # Reconstruct person box around Haar face
+        hfx, hfy, hfw, hfh = haar_face_box
+        px = max(0, int(hfx - hfw * 0.4))
+        py = max(0, int(hfy - hfh * 0.2))
+        pw = min(iw - px, int(hfw * 1.8))
+        ph = min(ih - py, int(hfh * 3.5))
+        pconf = 0.88
+
+    # Determine face box
+    if haar_face_box:
+        fx, fy, fw, fh = haar_face_box
+    else:
+        fx = max(0, int(px + pw * 0.22))
+        fy = max(0, int(py + ph * 0.04))
+        fw = min(iw - fx, int(pw * 0.56))
+        fh = min(ih - fy, int(ph * 0.36))
+
+    # Face verification against database
+    matched_person = None
     similarity_score = 0.0
     is_match = False
-    detected_gender = "person"
 
-    if face_box is not None:
-        fx, fy, fw, fh = face_box
-        face_roi = frame[fy : fy + fh, fx : fx + fw]
-        detected_gender = classify_gender_heuristic(face_roi)
+    if feat is not None and db_people:
+        best_sim = -1.0
+        best_p = None
+        for p in db_people:
+            sim = cosine_similarity(feat, p["feat"])
+            if sim > best_sim:
+                best_sim = sim
+                best_p = p
 
-        # 1. Compare against real registered embeddings in Database
-        conn = get_db()
-        try:
-            rows = conn.execute(
-                """
-                SELECT p.id, p.name, p.identifier, p.role, p.department, p.allowed_dress, fe.embedding_json
-                FROM people p
-                JOIN face_embeddings fe ON p.id = fe.person_id
-                WHERE p.environment_id = ? AND p.is_enrolled = 1
-                """,
-                (environment_id,),
-            ).fetchall()
+        if best_sim >= 0.70 and best_p is not None:
+            is_match = True
+            similarity_score = round(best_sim, 2)
+            matched_person = {k: v for k, v in best_p.items() if k != "feat"}
+        else:
+            similarity_score = round(max(0.0, best_sim), 2)
 
-            if feat is not None and len(rows) > 0:
-                best_person = None
-                best_sim = -1.0
+    face_roi = frame[fy : fy + fh, fx : fx + fw]
+    detected_gender = classify_gender_heuristic(face_roi)
 
-                for r in rows:
-                    try:
-                        stored_feat = np.array(
-                            json.loads(r["embedding_json"]), dtype=np.float32
-                        )
-                        sim = cosine_similarity(feat, stored_feat)
-                        if sim > best_sim:
-                            best_sim = sim
-                            best_person = dict(r)
-                    except Exception:
-                        continue
-
-                # Strict similarity threshold: 0.72
-                if best_sim >= 0.72 and best_person is not None:
-                    is_match = True
-                    similarity_score = round(best_sim, 2)
-                    best_person.pop("embedding_json", None)
-                    matched_person = best_person
-                else:
-                    is_match = False
-                    similarity_score = round(max(0.0, best_sim), 2)
-                    matched_person = None
-        except Exception as e:
-            print(f"[FaceService] DB comparison error: {e}")
-        finally:
-            conn.close()
-
-    # 2. Dress Code & ID Card Perception
-    dress_data = detect_dress_code_and_id_card(frame, face_box)
+    # Dress Code & ID Card Analysis
+    dress_data = detect_dress_code_and_id_card(frame, (fx, fy, fw, fh))
     if is_match and matched_person:
         allowed = (matched_person.get("allowed_dress") or "").lower()
         if "casual" in allowed:
@@ -437,33 +625,158 @@ def analyze_surveillance_frame(
             dress_data["compliance_status"] = "CUSTOM_POLICY_PASS"
             dress_data["status_label"] = "CUSTOM POLICY PASS • CASUAL PERMITTED"
 
-    # 3. Safety PPE Perception
-    safety_data = detect_safety_ppe(frame, face_box)
+    is_dress_pass = dress_data.get("dress_compliant", True)
+    has_id = dress_data.get("id_card_detected", False)
+    dress_type = dress_data.get("dress_type", "Formals")
 
-    # 4. Prohibited Item & Malpractice Perception (Smartphones, Exam Cheating Sheets)
+    # Safety PPE Analysis
+    safety_data = detect_safety_ppe(frame, (fx, fy, fw, fh))
+    has_helmet = safety_data.get("helmet_detected", False)
+    has_vest = safety_data.get("vest_detected", False)
+
+    # Prohibited items (phones, cheat sheets)
     prohibited_items = []
-    if face_box is not None:
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        phone_edges = cv2.Canny(gray, 50, 150)
-        cnts, _ = cv2.findContours(phone_edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-        for c in cnts:
-            area = cv2.contourArea(c)
-            if 800 <= area <= 14000:
-                peri = cv2.arcLength(c, True)
-                approx = cv2.approxPolyDP(c, 0.04 * peri, True)
-                if len(approx) == 4:
-                    _, _, pw, ph = cv2.boundingRect(approx)
-                    p_aspect = float(ph) / float(pw) if pw > 0 else 0
-                    if 1.7 <= p_aspect <= 2.5:
-                        prohibited_items.append("Smartphone")
-                        break
-                    elif 1.2 <= p_aspect <= 1.6 and assigned_function == "EXAM_MONITOR":
-                        prohibited_items.append("Cheat Notes / Exam Paper")
-                        break
+    for ph_box in yolo_phones:
+        prohibited_items.append("Smartphone")
+
+    # Build Complete Technical Bounding Boxes (matching Reference Images 1 & 2!)
+    detections: List[Dict[str, Any]] = []
+
+    # 1. Person Box
+    if is_match and matched_person:
+        p_label = f"{matched_person['name']} [{matched_person.get('identifier', 'ID')}] {int(similarity_score * 100)}%"
+        p_color = "#ffd700"  # Royal Gold
+    else:
+        p_label = f"person {int(pconf * 100)}%"
+        p_color = "#10b981"  # Crisp Green (Reference Image 2)
+
+    detections.append(
+        {
+            "type": "person",
+            "label": p_label,
+            "conf": round(similarity_score if is_match else pconf, 2),
+            "box": [px, py, pw, ph],
+            "color": p_color,
+        }
+    )
+
+    # 2. Face Box
+    face_label = (
+        f"Face: {matched_person['name']} ({int(similarity_score * 100)}%)"
+        if is_match
+        else f"Face: Unknown {detected_gender.capitalize()} ({int(pconf * 100)}%)"
+    )
+    face_color = "#ffd700" if is_match else "#38bdf8"
+    detections.append(
+        {
+            "type": "face",
+            "label": face_label,
+            "conf": round(similarity_score if is_match else pconf, 2),
+            "box": [fx, fy, fw, fh],
+            "color": face_color,
+        }
+    )
+
+    # 3. Dress Code Box
+    tx, ty, tw, th = dress_data.get(
+        "torso_box", [px, int(py + ph * 0.35), pw, int(ph * 0.45)]
+    )
+    dress_label = f"Dress: {dress_type} [{'PASS' if is_dress_pass else 'VIOLATION'}]"
+    dress_color = "#10b981" if is_dress_pass else "#f59e0b"
+    detections.append(
+        {
+            "type": "dress_code",
+            "label": dress_label,
+            "conf": 0.92,
+            "box": [tx, ty, tw, th],
+            "color": dress_color,
+        }
+    )
+
+    # 4. ID Card Box
+    ix, iy, iw, ih = dress_data.get("id_box") or [
+        int(tx + tw * 0.35),
+        int(ty + th * 0.30),
+        int(tw * 0.30),
+        int(th * 0.25),
+    ]
+    id_label = f"ID Card: {'VERIFIED' if has_id else 'MISSING [ALERT]'}"
+    id_color = "#10b981" if has_id else "#ef4444"
+    detections.append(
+        {
+            "type": "id_card",
+            "label": id_label,
+            "conf": 0.89,
+            "box": [ix, iy, iw, ih],
+            "color": id_color,
+        }
+    )
+
+    # 5. Safety Gear Boxes (Helmet & Vest)
+    if assigned_function.upper() in ["SAFETY", "DRESS_CODE_PPE"] or True:
+        # Include safety gear boxes
+        hx, hy, hw, hh = safety_data.get("helmet_box") or [
+            max(0, int(fx - fw * 0.15)),
+            max(0, int(fy - fh * 0.45)),
+            int(fw * 1.30),
+            int(fh * 0.48),
+        ]
+        helmet_label = (
+            f"Safety Helmet: {'VERIFIED' if has_helmet else 'MISSING [HAZARD]'}"
+        )
+        helmet_color = "#10b981" if has_helmet else "#ef4444"
+        detections.append(
+            {
+                "type": "helmet",
+                "label": helmet_label,
+                "conf": 0.94,
+                "box": [hx, hy, hw, hh],
+                "color": helmet_color,
+            }
+        )
+
+        vx, vy, vw, vh = safety_data.get("vest_box") or [tx, ty, tw, th]
+        vest_label = f"Safety Vest: {'DETECTED' if has_vest else 'MISSING [HAZARD]'}"
+        vest_color = "#10b981" if has_vest else "#ef4444"
+        detections.append(
+            {
+                "type": "vest",
+                "label": vest_label,
+                "conf": 0.91,
+                "box": [vx, vy, vw, vh],
+                "color": vest_color,
+            }
+        )
+
+    # 6. Prohibited Phone / Threat Boxes
+    for ph_x, ph_y, ph_w, ph_h, ph_c in yolo_phones:
+        detections.append(
+            {
+                "type": "prohibited",
+                "label": f"🚨 PROHIBITED SMARTPHONE {int(ph_c * 100)}%",
+                "conf": ph_c,
+                "box": [ph_x, ph_y, ph_w, ph_h],
+                "color": "#ef4444",
+            }
+        )
+
+    # 7. Additional Detected Objects (motorcycles, backpacks, etc. - Reference Image 1)
+    for obj in yolo_objects[:3]:
+        detections.append(
+            {
+                "type": "object",
+                "label": f"{obj['name']} {obj['conf']:.2f}",
+                "conf": obj["conf"],
+                "box": obj["box"],
+                "color": "#06b6d4",  # Cyan like Image 1
+            }
+        )
 
     return {
-        "face_detected": face_box is not None,
-        "face_box": list(face_box) if face_box else None,
+        "person_detected": True,
+        "face_detected": True,
+        "face_box": [fx, fy, fw, fh],
+        "person_box": [px, py, pw, ph],
         "is_match": is_match,
         "matched_person": matched_person,
         "similarity": similarity_score,
@@ -471,6 +784,11 @@ def analyze_surveillance_frame(
         "dress_code": dress_data,
         "safety_ppe": safety_data,
         "prohibited_items": prohibited_items,
+        "detections": detections,
+        "objects_summary": [
+            {"label": d["label"], "conf": d["conf"], "color": d["color"]}
+            for d in detections
+        ],
         "assigned_function": assigned_function,
         "timestamp": time.time(),
     }

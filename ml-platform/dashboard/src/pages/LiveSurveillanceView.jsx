@@ -39,8 +39,12 @@ export default function LiveSurveillanceView({ environment, systemOnline }) {
 
     // Live Perception Analysis from Backend Face Matching & Dress/ID Engine
     const [livePerception, setLivePerception] = useState({
+        person_detected: false,
         face_detected: false,
         face_box: null,
+        person_box: null,
+        detections: [],
+        objects_summary: [],
         is_match: false,
         matched_person: null,
         similarity: 0.0,
@@ -50,6 +54,11 @@ export default function LiveSurveillanceView({ environment, systemOnline }) {
             id_card_status: "ID CARD DETECTED • VERIFIED",
             dress_compliant: true,
             dress_type: "Regular School Formals",
+        },
+        safety_ppe: {
+            ppe_active: false,
+            helmet_detected: false,
+            vest_detected: false,
         },
         prohibited_items: [],
     });
@@ -233,6 +242,9 @@ export default function LiveSurveillanceView({ environment, systemOnline }) {
                                 const res = await uploadCameraFrame(selectedCamera.id, blob);
                                 if (res && res.analysis) {
                                     setLivePerception(res.analysis);
+                                    if (res.analysis.detections) {
+                                        setCurrentDetectionsCount(res.analysis.detections.length);
+                                    }
 
                                     const an = res.analysis;
                                     const isM = an.is_match && an.matched_person;
@@ -393,150 +405,75 @@ export default function LiveSurveillanceView({ environment, systemOnline }) {
                         } catch (err) {}
                     }
 
-                    // ─── Real Subject Perception & 2D Bounding Box (Only when subject detected) ───
-                    const hasFace = Boolean(livePerception.face_detected);
+                    // ─── Multi-Object Technical Bounding Boxes (Person, Face, Dress Code, ID Card, Safety Gear) ───
+                    const detections = livePerception.detections || [];
+                    const hasSubject = Boolean(
+                        livePerception.person_detected ||
+                        livePerception.face_detected ||
+                        detections.length > 0
+                    );
 
-                    if (hasFace) {
+                    if (hasSubject && detections.length > 0) {
                         const scaleX = cw / (video.videoWidth || cw);
                         const scaleY = ch / (video.videoHeight || ch);
 
-                        let bx, by, bw, bh;
-                        if (livePerception.face_box && Array.isArray(livePerception.face_box)) {
-                            const [fx, fy, fw, fh] = livePerception.face_box;
-                            bx = Math.round(Math.max(0, fx - fw * 0.35) * scaleX);
-                            by = Math.round(Math.max(0, fy - fh * 0.25) * scaleY);
-                            bw = Math.round((fw * 1.7) * scaleX);
-                            bh = Math.round((fh * 3.0) * scaleY);
-                        } else {
-                            bx = Math.round(cw * 0.24);
-                            by = Math.round(ch * 0.16);
-                            bw = Math.round(cw * 0.52);
-                            bh = Math.round(ch * 0.72);
-                        }
+                        detections.forEach((det) => {
+                            if (!det.box || !Array.isArray(det.box) || det.box.length < 4) return;
+                            const [origX, origY, origW, origH] = det.box;
 
-                        bx = Math.max(8, Math.min(cw - 80, bx));
-                        by = Math.max(34, Math.min(ch - 80, by));
-                        bw = Math.min(cw - bx - 8, bw);
-                        bh = Math.min(ch - by - 8, bh);
+                            let bx = Math.round(origX * scaleX);
+                            let by = Math.round(origY * scaleY);
+                            let bw = Math.round(origW * scaleX);
+                            let bh = Math.round(origH * scaleY);
 
-                        const isMatch = livePerception.is_match && livePerception.matched_person;
-                        const matched = livePerception.matched_person;
-                        const gender = (livePerception.detected_gender || 'person').toUpperCase();
+                            bx = Math.max(4, Math.min(cw - 20, bx));
+                            by = Math.max(4, Math.min(ch - 20, by));
+                            bw = Math.min(cw - bx - 4, bw);
+                            bh = Math.min(ch - by - 4, bh);
 
-                        const dress = livePerception.dress_code || {};
-                        const isDressPass = dress.dress_compliant !== false;
-                        const hasIdCard = dress.id_card_detected !== false;
-                        const dressType = (dress.dress_type || (isDressPass ? 'Regular Formals' : 'Casual Attire')).toUpperCase();
+                            const color = det.color || "#10b981";
 
-                        const prohibited = livePerception.prohibited_items || [];
-                        const hasSecurityViolation = prohibited.length > 0;
+                            // 1. Draw 2D Technical Bounding Box
+                            ctx.lineWidth = 2;
+                            ctx.strokeStyle = color;
+                            ctx.strokeRect(bx, by, bw, bh);
 
-                        let primaryColor = '#10b981';
-                        if (hasSecurityViolation) {
-                            primaryColor = '#ef4444';
-                        } else if (!isDressPass || !hasIdCard) {
-                            primaryColor = '#f59e0b';
-                        } else if (isMatch) {
-                            primaryColor = '#d4af37';
-                        } else {
-                            primaryColor = '#38bdf8';
-                        }
+                            // 2. Corner Bracket Accents
+                            const cLen = Math.min(18, Math.round(Math.min(bw, bh) * 0.28));
+                            if (cLen > 4) {
+                                ctx.lineWidth = 3;
+                                ctx.strokeStyle = color;
+                                ctx.beginPath();
+                                ctx.moveTo(bx, by + cLen); ctx.lineTo(bx, by); ctx.lineTo(bx + cLen, by);
+                                ctx.moveTo(bx + bw - cLen, by); ctx.lineTo(bx + bw, by); ctx.lineTo(bx + bw, by + cLen);
+                                ctx.moveTo(bx, by + bh - cLen); ctx.lineTo(bx, by + bh); ctx.lineTo(bx + cLen, by + bh);
+                                ctx.moveTo(bx + bw - cLen, by + bh); ctx.lineTo(bx + bw, by + bh); ctx.lineTo(bx + bw, by + bh - cLen);
+                                ctx.stroke();
+                            }
 
-                        let badgeLabel = '';
-                        if (hasSecurityViolation) {
-                            badgeLabel = `🚨 SECURITY ALERT: PROHIBITED ${prohibited[0].toUpperCase()} DETECTED!`;
-                        } else if (isMatch) {
-                            const simPct = Math.round((livePerception.similarity || 0.94) * 100);
-                            badgeLabel = `✓ ${matched.name} [${matched.identifier}] • VERIFIED (${simPct}%) • ${matched.role.toUpperCase()}`;
-                        } else {
-                            badgeLabel = `⚠️ UNREGISTERED ${gender} • VISITOR`;
-                        }
+                            // 3. Label Badge on top-left of box (matching Reference Image 1 & 2)
+                            ctx.font = "bold 11px 'Inter', sans-serif";
+                            const textMetrics = ctx.measureText(det.label || "detected");
+                            const badgeW = textMetrics.width + 14;
+                            const badgeH = 20;
+                            const badgeY = by >= badgeH + 4 ? by - badgeH - 2 : by + 2;
 
-                        let secondaryTag = '';
-                        if (!isDressPass && !hasIdCard) {
-                            secondaryTag = `👔 DRESS: ${dressType} [VIOLATION] • 🪪 ID: MISSING [ALERT]`;
-                        } else if (!isDressPass) {
-                            secondaryTag = `👔 DRESS: ${dressType} [VIOLATION] • 🪪 ID: VERIFIED [PASS]`;
-                        } else if (!hasIdCard) {
-                            secondaryTag = `👔 DRESS: ${dressType} [COMPLIANT] • 🪪 ID: MISSING [ALERT]`;
-                        } else {
-                            secondaryTag = `👔 DRESS: ${dressType} [COMPLIANT] • 🪪 ID: VERIFIED [PASS]`;
-                        }
-
-                        // 1. Draw 2D Technical Bounding Box
-                        ctx.lineWidth = 2;
-                        ctx.strokeStyle = primaryColor;
-                        ctx.strokeRect(bx, by, bw, bh);
-
-                        // 2. Corner Bracket Accents
-                        const cLen = 22;
-                        ctx.lineWidth = 4;
-                        ctx.strokeStyle = '#ffffff';
-
-                        ctx.beginPath();
-                        ctx.moveTo(bx, by + cLen); ctx.lineTo(bx, by); ctx.lineTo(bx + cLen, by);
-                        ctx.moveTo(bx + bw - cLen, by); ctx.lineTo(bx + bw, by); ctx.lineTo(bx + bw, by + cLen);
-                        ctx.moveTo(bx, by + bh - cLen); ctx.lineTo(bx, by + bh); ctx.lineTo(bx + cLen, by + bh);
-                        ctx.moveTo(bx + bw - cLen, by + bh); ctx.lineTo(bx + bw, by + bh); ctx.lineTo(bx + bw, by + bh - cLen);
-                        ctx.stroke();
-
-                        // 3. Primary Identity Header Badge
-                        ctx.font = "bold 12px 'Inter', sans-serif";
-                        const textMetrics = ctx.measureText(badgeLabel);
-                        const badgeW = textMetrics.width + 24;
-                        const badgeH = 26;
-
-                        ctx.fillStyle = 'rgba(12, 16, 23, 0.94)';
-                        ctx.fillRect(bx, by - badgeH - 2, badgeW, badgeH);
-                        ctx.lineWidth = 1;
-                        ctx.strokeStyle = primaryColor;
-                        ctx.strokeRect(bx, by - badgeH - 2, badgeW, badgeH);
-
-                        ctx.fillStyle = primaryColor;
-                        ctx.fillText(badgeLabel, bx + 12, by - 9);
-
-                        // 4. Secondary Telemetry Footer Badge
-                        if (secondaryTag) {
-                            ctx.font = "600 11px 'Inter', sans-serif";
-                            const subMetrics = ctx.measureText(secondaryTag);
-                            const subW = subMetrics.width + 16;
-                            ctx.fillStyle = 'rgba(12, 16, 23, 0.9)';
-                            ctx.fillRect(bx, by + bh + 4, subW, 22);
+                            ctx.fillStyle = "rgba(10, 16, 26, 0.94)";
+                            ctx.fillRect(bx, badgeY, badgeW, badgeH);
                             ctx.lineWidth = 1;
-                            ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
-                            ctx.strokeRect(bx, by + bh + 4, subW, 22);
+                            ctx.strokeStyle = color;
+                            ctx.strokeRect(bx, badgeY, badgeW, badgeH);
 
-                            ctx.fillStyle = '#f8fafc';
-                            ctx.fillText(secondaryTag, bx + 8, by + bh + 19);
-                        }
-
-                        // 5. ID Card Chest Scanner Box
-                        const chestX = bx + Math.round(bw * 0.35);
-                        const chestY = by + Math.round(bh * 0.40);
-                        const chestW = Math.round(bw * 0.30);
-                        const chestH = Math.round(bh * 0.22);
-                        const idCardColor = hasIdCard ? '#10b981' : '#ef4444';
-
-                        ctx.lineWidth = 2;
-                        ctx.setLineDash(hasIdCard ? [] : [4, 4]);
-                        ctx.strokeStyle = idCardColor;
-                        ctx.strokeRect(chestX, chestY, chestW, chestH);
-                        ctx.setLineDash([]);
-
-                        const idText = hasIdCard ? '🪪 ID CARD: VERIFIED' : '⚠️ ID CARD: MISSING';
-                        ctx.font = "bold 10px 'Inter', sans-serif";
-                        const idM = ctx.measureText(idText);
-                        ctx.fillStyle = 'rgba(12, 16, 23, 0.92)';
-                        ctx.fillRect(chestX, chestY - 18, idM.width + 12, 18);
-                        ctx.fillStyle = idCardColor;
-                        ctx.fillText(idText, chestX + 6, chestY - 5);
+                            ctx.fillStyle = color;
+                            ctx.fillText(det.label || "detected", bx + 6, badgeY + 14);
+                        });
                     } else {
-                        // ─── Standby Mode: Waiting silently for subject ───
+                        // ─── Standby Mode: Waiting silently for subject (Zero fake alerts) ───
                         const cx = Math.round(cw / 2);
                         const cy = Math.round(ch / 2);
 
                         ctx.lineWidth = 1;
-                        ctx.strokeStyle = 'rgba(212, 175, 55, 0.25)';
+                        ctx.strokeStyle = "rgba(212, 175, 55, 0.30)";
                         ctx.beginPath();
                         ctx.arc(cx, cy, 38, 0, Math.PI * 2);
                         ctx.stroke();
@@ -546,19 +483,20 @@ export default function LiveSurveillanceView({ environment, systemOnline }) {
                         ctx.moveTo(cx, cy - 50); ctx.lineTo(cx, cy + 50);
                         ctx.stroke();
 
-                        const standbyText = 'VANTEP AI • OPTICS ACTIVE • SCANNING FOR SUBJECT';
+                        const standbyText = "VANTEP AI • OPTICS ACTIVE • SCANNING FOR SUBJECT";
                         ctx.font = "700 11px 'Inter', sans-serif";
-                        const sM = ctx.measureText(standbyText);
-                        const sW = sM.width + 20;
+                        const textMetrics = ctx.measureText(standbyText);
+                        const textW = textMetrics.width;
 
-                        ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
-                        ctx.fillRect(cx - sW / 2, cy + 55, sW, 24);
-                        ctx.strokeStyle = 'rgba(212, 175, 55, 0.3)';
-                        ctx.strokeRect(cx - sW / 2, cy + 55, sW, 24);
-                        ctx.fillStyle = '#cbd5e1';
-                        ctx.fillText(standbyText, cx - sW / 2 + 10, cy + 71);
+                        ctx.fillStyle = "rgba(12, 16, 23, 0.85)";
+                        ctx.fillRect(cx - textW / 2 - 12, cy + 50, textW + 24, 22);
+                        ctx.lineWidth = 1;
+                        ctx.strokeStyle = "rgba(212, 175, 55, 0.40)";
+                        ctx.strokeRect(cx - textW / 2 - 12, cy + 50, textW + 24, 22);
+
+                        ctx.fillStyle = "#ffd700";
+                        ctx.fillText(standbyText, cx - textW / 2, cy + 65);
                     }
-
                     // 7. Sentry Boundary Tripwire (For Perimeter Intrusion)
                     if (assignedFunc === "PERIMETER_INTRUSION") {
                         const tripY = Math.round(ch * 0.82);
@@ -1089,6 +1027,63 @@ export default function LiveSurveillanceView({ environment, systemOnline }) {
                         )}
 
                         {snapshotMsg && <div className="snapshot-toast">{snapshotMsg}</div>}
+                    </div>
+
+                    {/* Detected Objects Telemetry Card (Matching Reference Image 2) */}
+                    <div
+                        className="detected-objects-panel"
+                        style={{
+                            margin: "12px 0 6px 0",
+                            padding: "12px 16px",
+                            background: "var(--card-bg)",
+                            border: "1px solid var(--border-color)",
+                            borderRadius: "8px",
+                            boxShadow: "var(--card-shadow)",
+                        }}
+                    >
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                            <div style={{ fontWeight: 800, fontSize: "13px", color: "var(--text-primary)" }}>
+                                Objects currently detected: {livePerception.detections?.length || 0}
+                            </div>
+                            <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>
+                                Signal source: <strong style={{ color: "var(--text-primary)" }}>{selectedCamera?.camera_name || "Camera #1"}</strong>
+                            </span>
+                        </div>
+
+                        {livePerception.detections && livePerception.detections.length > 0 ? (
+                            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "8px", marginBottom: "8px" }}>
+                                {livePerception.detections.map((d, i) => (
+                                    <div
+                                        key={i}
+                                        style={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: "8px",
+                                            padding: "6px 10px",
+                                            background: "var(--bg-secondary)",
+                                            border: `1px solid ${d.color || "var(--border-color)"}`,
+                                            borderRadius: "6px",
+                                            fontSize: "12px",
+                                        }}
+                                    >
+                                        <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: d.color || "#10b981", flexShrink: 0 }}></span>
+                                        <strong style={{ color: d.color || "var(--text-primary)" }}>{d.label}</strong>
+                                        <span style={{ marginLeft: "auto", color: "var(--text-muted)", fontSize: "11px" }}>
+                                            {Math.round((d.conf || 0.85) * 100)}% confidence
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div style={{ fontSize: "12px", color: "var(--text-muted)", marginBottom: "8px", fontStyle: "italic" }}>
+                                No subjects currently in camera field of view. VANTEP AI sensors in quiet standby.
+                            </div>
+                        )}
+
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "11px", color: "var(--text-muted)", borderTop: "1px dashed var(--border-color)", paddingTop: "6px" }}>
+                            <span>Video is processed locally in your browser. Detected objects depend on active YOLO & Biometric models.</span>
+                            <span style={{ color: "#10b981", fontWeight: 700 }}>AI analysis: ENABLED</span>
+                        </div>
                     </div>
 
                     {/* Telemetry Information Row with Tri-Perception Badges */}

@@ -321,7 +321,9 @@ async def upload_camera_frame(camera_id: str, file: UploadFile = File(...)):
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     # PILLAR 1: Face Attendance & Unknown Capture
-    face_is_detected = analysis.get("face_detected", False)
+    face_is_detected = analysis.get("face_detected", False) or analysis.get(
+        "person_detected", False
+    )
     cam_name = f"Camera #{camera_id}"
     cam_loc = "Main Sector"
 
@@ -530,6 +532,9 @@ async def upload_camera_frame(camera_id: str, file: UploadFile = File(...)):
             except Exception as e:
                 print(f"[CameraStream] Security alert error: {e}")
 
+    if str_id in mobile_uploaded_frames:
+        mobile_uploaded_frames[str_id]["timestamp"] = time.time()
+
     # Ensure worker thread is initialized
     get_camera(str_id)
 
@@ -602,7 +607,7 @@ def camera_stream_status(camera_id: str):
     is_hardware = camera_instances.get(str_id) is not None
     has_mobile_stream = (
         str_id in mobile_uploaded_frames
-        and (time.time() - mobile_uploaded_frames[str_id]["timestamp"]) < 10.0
+        and (time.time() - mobile_uploaded_frames[str_id]["timestamp"]) < 30.0
     )
 
     return {
