@@ -47,6 +47,88 @@ def get_yolo_model():
     return _yolo_model
 
 
+# In-memory cache for enrolled people embeddings to eliminate per-frame SQLite disk I/O & JSON parsing
+_people_cache: Dict[int, Tuple[float, List[Dict[str, Any]]]] = {}
+
+
+def get_cached_enrolled_people(
+    environment_id: int, max_age_sec: float = 15.0
+) -> List[Dict[str, Any]]:
+    """Returns cached enrolled personnel embeddings in memory. Refresh every 15s or on invalidation."""
+    now = time.time()
+    if environment_id in _people_cache:
+        cached_ts, people_list = _people_cache[environment_id]
+        if now - cached_ts < max_age_sec:
+            return people_list
+
+    conn = get_db()
+    db_people: List[Dict[str, Any]] = []
+    try:
+        rows = conn.execute(
+            """
+            SELECT p.id, p.name, p.identifier, p.role, p.department, p.allowed_dress, fe.embedding_json
+            FROM people p
+            JOIN face_embeddings fe ON p.id = fe.person_id
+            WHERE p.environment_id = ? AND p.is_enrolled = 1
+            """,
+            (environment_id,),
+        ).fetchall()
+        for r in rows:
+            try:
+                db_people.append(
+                    {
+                        "id": r["id"],
+                        "name": r["name"],
+                        "identifier": r["identifier"],
+                        "role": r["role"],
+                        "department": r["department"],
+                        "allowed_dress": r["allowed_dress"],
+                        "feat": np.array(
+                            json.loads(r["embedding_json"]), dtype=np.float32
+                        ),
+                    }
+                )
+            except Exception:
+                continue
+    except Exception as e:
+        print(f"[FaceService] DB cache error: {e}")
+    finally:
+        conn.close()
+
+    _people_cache[environment_id] = (now, db_people)
+    return db_people
+
+
+def invalidate_people_cache(environment_id: Optional[int] = None):
+    """Call whenever a person is registered, edited, or deleted."""
+    global _people_cache
+    if environment_id is not None:
+        _people_cache.pop(environment_id, None)
+    else:
+        _people_cache.clear()
+
+
+def warmup_ai_models():
+    """Pre-loads and warms up YOLO and face recognition models in background thread on server startup."""
+    global _yolo_model
+    try:
+        m = get_yolo_model()
+        if m is not None:
+            dummy = np.zeros((384, 384, 3), dtype=np.uint8)
+            try:
+                import torch
+
+                with torch.inference_mode():
+                    m(dummy, imgsz=384, conf=0.35, verbose=False)
+            except Exception:
+                m(dummy, imgsz=384, conf=0.35, verbose=False)
+            print("[Sentronix AI] YOLOv11 & Vision models pre-warmed and ready.")
+        # Pre-cache enrolled people
+        get_cached_enrolled_people(1)
+    except Exception as e:
+        print(f"[Sentronix AI] Warmup notice: {e}")
+
+
 def get_db():
     DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(DATABASE_PATH))
@@ -56,6 +138,7 @@ def get_db():
 
 def extract_face_embedding(
     img: np.ndarray,
+    known_face_box: Optional[Tuple[int, int, int, int]] = None,
 ) -> Tuple[Optional[np.ndarray], Optional[Tuple[int, int, int, int]]]:
     """
     Detects face (via Haar Cascade or YOLO person head localization)
@@ -67,8 +150,12 @@ def extract_face_embedding(
     ih, iw = img.shape[:2]
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) if len(img.shape) == 3 else img
 
-    # Stage 1: Try Haar cascade
-    face_box = None
+    # Fast path: Use known face box if already located by YOLO
+    if known_face_box is not None:
+        face_box = known_face_box
+    else:
+        # Stage 1: Try Haar cascade
+        face_box = None
     if face_cascade is not None:
         faces = face_cascade.detectMultiScale(
             gray, scaleFactor=1.1, minNeighbors=4, minSize=(32, 32)
@@ -483,7 +570,10 @@ def analyze_surveillance_frame(
 
     if model is not None:
         try:
-            res = model(frame, conf=0.35, verbose=False)
+            import torch
+
+            with torch.inference_mode():
+                res = model(frame, imgsz=384, conf=0.35, verbose=False)
             if res and len(res) > 0 and res[0].boxes is not None:
                 for b in res[0].boxes:
                     cls_id = int(b.cls.item())
@@ -505,9 +595,39 @@ def analyze_surveillance_frame(
         except Exception as e:
             print(f"[FaceService] YOLO inference error: {e}")
 
-    # Stage 2: Fallback to Haar cascade if no YOLO person was found
-    feat, haar_face_box = extract_face_embedding(frame)
-    has_person = len(yolo_persons) > 0 or haar_face_box is not None
+    # Determine primary face region before embedding to avoid redundant inference
+    haar_face_box = None
+    if face_cascade is not None:
+        gray = (
+            cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY) if len(frame.shape) == 3 else frame
+        )
+        faces = face_cascade.detectMultiScale(
+            gray, scaleFactor=1.1, minNeighbors=4, minSize=(32, 32)
+        )
+        if len(faces) > 0:
+            faces = sorted(faces, key=lambda f: f[2] * f[3], reverse=True)
+            haar_face_box = (
+                int(faces[0][0]),
+                int(faces[0][1]),
+                int(faces[0][2]),
+                int(faces[0][3]),
+            )
+
+    # If Haar found nothing but YOLO found person, derive face box from person box
+    target_face_box = haar_face_box
+    if target_face_box is None and yolo_persons:
+        yolo_persons.sort(key=lambda p: p[2] * p[3], reverse=True)
+        tpx, tpy, tpw, tph, _ = yolo_persons[0]
+        tfx = max(0, int(tpx + tpw * 0.22))
+        tfy = max(0, int(tpy + tph * 0.04))
+        tfw = min(iw - tfx, int(tpw * 0.56))
+        tfh = min(ih - tfy, int(tph * 0.36))
+        if tfw >= 24 and tfh >= 24:
+            target_face_box = (tfx, tfy, tfw, tfh)
+
+    # Extract 128-d spatial embedding using the located face box (Zero redundant YOLO run!)
+    feat, _ = extract_face_embedding(frame, known_face_box=target_face_box)
+    has_person = len(yolo_persons) > 0 or target_face_box is not None
 
     if not has_person:
         # Standby mode: No subject in frame, zero fake alerts!
@@ -537,38 +657,8 @@ def analyze_surveillance_frame(
             "timestamp": time.time(),
         }
 
-    # Fetch registered personnel embeddings from database
-    db_people = []
-    conn = get_db()
-    try:
-        rows = conn.execute(
-            """
-            SELECT p.id, p.name, p.identifier, p.role, p.department, p.allowed_dress, fe.embedding_json
-            FROM people p
-            JOIN face_embeddings fe ON p.id = fe.person_id
-            WHERE p.environment_id = ? AND p.is_enrolled = 1
-            """,
-            (environment_id,),
-        ).fetchall()
-        for r in rows:
-            try:
-                db_people.append(
-                    {
-                        "id": r["id"],
-                        "name": r["name"],
-                        "identifier": r["identifier"],
-                        "role": r["role"],
-                        "department": r["department"],
-                        "allowed_dress": r["allowed_dress"],
-                        "feat": np.array(
-                            json.loads(r["embedding_json"]), dtype=np.float32
-                        ),
-                    }
-                )
-            except Exception:
-                continue
-    finally:
-        conn.close()
+    # Fetch registered personnel embeddings from high-speed memory cache (Zero SQLite disk delay)
+    db_people = get_cached_enrolled_people(environment_id)
 
     # Determine primary person box
     if yolo_persons:
@@ -642,12 +732,12 @@ def analyze_surveillance_frame(
     # Build Complete Technical Bounding Boxes (matching Reference Images 1 & 2!)
     detections: List[Dict[str, Any]] = []
 
-    # 1. Person Box
+    # 1. Primary Subject Bounding Boxes
     if is_match and matched_person:
         p_label = f"{matched_person['name']} [{matched_person.get('identifier', 'ID')}] {int(similarity_score * 100)}%"
         p_color = "#ffd700"  # Royal Gold
     else:
-        p_label = f"person {int(pconf * 100)}%"
+        p_label = f"person {pconf:.2f}"
         p_color = "#10b981"  # Crisp Green (Reference Image 2)
 
     detections.append(
@@ -660,7 +750,7 @@ def analyze_surveillance_frame(
         }
     )
 
-    # 2. Face Box
+    # 2. Primary Face Box
     face_label = (
         f"Face: {matched_person['name']} ({int(similarity_score * 100)}%)"
         if is_match
@@ -677,7 +767,7 @@ def analyze_surveillance_frame(
         }
     )
 
-    # 3. Dress Code Box
+    # 3. Primary Dress Code Box (Evaluated on every person, enrolled or unenrolled)
     tx, ty, tw, th = dress_data.get(
         "torso_box", [px, int(py + ph * 0.35), pw, int(ph * 0.45)]
     )
@@ -693,7 +783,7 @@ def analyze_surveillance_frame(
         }
     )
 
-    # 4. ID Card Box
+    # 4. Primary ID Card Box
     ix, iy, iw, ih = dress_data.get("id_box") or [
         int(tx + tw * 0.35),
         int(ty + th * 0.30),
@@ -712,9 +802,14 @@ def analyze_surveillance_frame(
         }
     )
 
-    # 5. Safety Gear Boxes (Helmet & Vest)
-    if assigned_function.upper() in ["SAFETY", "DRESS_CODE_PPE"] or True:
-        # Include safety gear boxes
+    # 5. Safety Gear Boxes (Helmet & Vest) - Conditional on function or positive detection
+    should_show_safety = (
+        assigned_function.upper() in ["SAFETY", "DRESS_CODE_PPE", "OSHA_SAFETY"]
+        or environment_id == 4  # Industry mode
+        or has_helmet
+        or has_vest
+    )
+    if should_show_safety:
         hx, hy, hw, hh = safety_data.get("helmet_box") or [
             max(0, int(fx - fw * 0.15)),
             max(0, int(fy - fh * 0.45)),
@@ -748,7 +843,35 @@ def analyze_surveillance_frame(
             }
         )
 
-    # 6. Prohibited Phone / Threat Boxes
+    # 6. Additional Persons in Frame (Matching Reference Image 1)
+    for idx, (spx, spy, spw, sph, spconf) in enumerate(yolo_persons[1:], start=2):
+        sec_color = "#38bdf8" if idx % 2 == 0 else "#06b6d4"
+        detections.append(
+            {
+                "type": "person",
+                "label": f"person {spconf:.2f}",
+                "conf": round(spconf, 2),
+                "box": [spx, spy, spw, sph],
+                "color": sec_color,
+            }
+        )
+        # Derive dress box for secondary person if sufficiently sized
+        if sph >= 80 and spw >= 40:
+            stx = max(0, int(spx + spw * 0.10))
+            sty = max(0, int(spy + sph * 0.25))
+            stw = min(iw - stx, int(spw * 0.80))
+            sth = min(ih - sty, int(sph * 0.45))
+            detections.append(
+                {
+                    "type": "dress_code",
+                    "label": f"person #{idx} attire",
+                    "conf": 0.85,
+                    "box": [stx, sty, stw, sth],
+                    "color": "#a3e635",
+                }
+            )
+
+    # 7. Prohibited Phone / Threat Boxes
     for ph_x, ph_y, ph_w, ph_h, ph_c in yolo_phones:
         detections.append(
             {
@@ -760,15 +883,15 @@ def analyze_surveillance_frame(
             }
         )
 
-    # 7. Additional Detected Objects (motorcycles, backpacks, etc. - Reference Image 1)
-    for obj in yolo_objects[:3]:
+    # 8. Additional Detected Objects (motorcycles, backpacks, etc. - Reference Image 1)
+    for obj in yolo_objects[:6]:
         detections.append(
             {
                 "type": "object",
                 "label": f"{obj['name']} {obj['conf']:.2f}",
                 "conf": obj["conf"],
                 "box": obj["box"],
-                "color": "#06b6d4",  # Cyan like Image 1
+                "color": "#06b6d4",  # Cyan like Reference Image 1
             }
         )
 

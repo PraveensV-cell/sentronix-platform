@@ -38,6 +38,10 @@
     padding: 36px 32px;
     box-sizing: border-box;
     transition: all 0.25s ease;
+    background: #0d1626;
+    border: 2px solid #d4af37;
+    box-shadow: 4px 4px 0px rgba(212, 175, 55, 0.30), 0 12px 32px rgba(0, 0, 0, 0.7);
+    color: #ffffff;
 }
 
 [data-theme="light"] .auth-card,
@@ -45,6 +49,7 @@
     background: #ffffff;
     border: 2px solid #c59b27;
     box-shadow: 4px 4px 0px rgba(197, 155, 39, 0.25), 0 8px 24px rgba(0, 0, 0, 0.08);
+    color: #0a0a0a;
 }
 
 [data-theme="dark"] .auth-card,
@@ -155,7 +160,9 @@
     font-size: 13px;
     font-weight: 700;
     border-radius: 6px;
-    border: 1px solid transparent;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: #111a2c;
+    color: #94a3b8;
     cursor: pointer;
     transition: all 0.2s ease;
     text-align: center;
@@ -251,6 +258,9 @@
     font-size: 13px;
     font-family: inherit;
     box-sizing: border-box;
+    background: #111a2d;
+    border: 1px solid rgba(212, 175, 55, 0.35);
+    color: #ffffff;
     transition: border-color 0.2s, box-shadow 0.2s;
 }
 
@@ -301,6 +311,9 @@
     border: none;
     cursor: pointer;
     margin-top: 8px;
+    background: #d4af37;
+    color: #0a101d;
+    box-shadow: 2px 2px 0px rgba(255, 215, 0, 0.35);
     transition: all 0.2s ease;
 }
 

@@ -4,6 +4,7 @@ import socket
 import sqlite3
 import threading
 import time
+from typing import Any, Dict, Tuple
 from pathlib import Path
 
 import cv2
@@ -268,6 +269,46 @@ def get_network_info():
     }
 
 
+# In-memory cache for camera fleet settings (avoids multiple disk reads per video frame)
+_camera_meta_cache: Dict[str, Tuple[float, Dict[str, Any]]] = {}
+
+
+def get_cached_camera_info(camera_id: str, max_age_sec: float = 30.0) -> Dict[str, Any]:
+    now = time.time()
+    if camera_id in _camera_meta_cache:
+        cached_ts, cam_info = _camera_meta_cache[camera_id]
+        if now - cached_ts < max_age_sec:
+            return cam_info
+
+    info = {
+        "assigned_function": "FACE_ATTENDANCE",
+        "environment_id": 1,
+        "camera_name": f"Camera #{camera_id}",
+        "location": "Main Sector",
+    }
+    try:
+        conn = get_db_connection()
+        row = conn.execute(
+            "SELECT camera_name, location, environment_id, assigned_function FROM cameras WHERE id = ?",
+            (str(camera_id),),
+        ).fetchone()
+        if row:
+            if row["assigned_function"]:
+                info["assigned_function"] = row["assigned_function"]
+            if row["environment_id"]:
+                info["environment_id"] = row["environment_id"]
+            if row["camera_name"]:
+                info["camera_name"] = row["camera_name"]
+            if row["location"]:
+                info["location"] = row["location"]
+        conn.close()
+    except Exception:
+        pass
+
+    _camera_meta_cache[str(camera_id)] = (now, info)
+    return info
+
+
 @router.post("/{camera_id}/upload-frame")
 async def upload_camera_frame(camera_id: str, file: UploadFile = File(...)):
     """
@@ -290,23 +331,12 @@ async def upload_camera_frame(camera_id: str, file: UploadFile = File(...)):
         "timestamp": time.time(),
     }
 
-    # Get camera settings (assigned function & environment)
-    assigned_function = "FACE_ATTENDANCE"
-    environment_id = 1
-    try:
-        conn = get_db_connection()
-        row = conn.execute(
-            "SELECT environment_id, assigned_function FROM cameras WHERE id = ?",
-            (str_id,),
-        ).fetchone()
-        if row:
-            if row["assigned_function"]:
-                assigned_function = row["assigned_function"]
-            if row["environment_id"]:
-                environment_id = row["environment_id"]
-        conn.close()
-    except Exception:
-        pass
+    # Fetch cached camera fleet settings (Zero SQLite latency)
+    cam_meta = get_cached_camera_info(str_id)
+    assigned_function = cam_meta["assigned_function"]
+    environment_id = cam_meta["environment_id"]
+    cam_name = cam_meta["camera_name"]
+    cam_loc = cam_meta["location"]
 
     # Run Real Face Recognition & Perception
     from api.face_recognition_service import analyze_surveillance_frame
@@ -324,30 +354,19 @@ async def upload_camera_frame(camera_id: str, file: UploadFile = File(...)):
     face_is_detected = analysis.get("face_detected", False) or analysis.get(
         "person_detected", False
     )
-    cam_name = f"Camera #{camera_id}"
-    cam_loc = "Main Sector"
 
-    # Fetch camera name & location from DB if available
-    try:
-        conn = get_db_connection()
-        c_row = conn.execute(
-            "SELECT camera_name, location FROM cameras WHERE id = ?", (str_id,)
-        ).fetchone()
-        if c_row:
-            cam_name = c_row["camera_name"] or cam_name
-            cam_loc = c_row["location"] or cam_loc
-        conn.close()
-    except Exception:
-        pass
+    # Lazy JPEG encoder helper - only encodes to bytes when an attendance or alert record is actually written
+    _cached_jpeg_bytes = None
 
-    # Encode current frame as JPEG bytes for snapshots
-    frame_jpeg_bytes = None
-    if face_is_detected:
-        try:
-            _, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
-            frame_jpeg_bytes = buf.tobytes()
-        except Exception:
-            frame_jpeg_bytes = None
+    def get_jpeg_bytes():
+        nonlocal _cached_jpeg_bytes
+        if _cached_jpeg_bytes is None:
+            try:
+                _, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
+                _cached_jpeg_bytes = buf.tobytes()
+            except Exception:
+                _cached_jpeg_bytes = None
+        return _cached_jpeg_bytes
 
     from api.dossier_manager import (
         record_person_attendance_file,
@@ -390,7 +409,7 @@ async def upload_camera_frame(camera_id: str, file: UploadFile = File(...)):
                         confidence=analysis["similarity"],
                         camera_name=cam_name,
                         location=cam_loc,
-                        snapshot_bytes=frame_jpeg_bytes,
+                        snapshot_bytes=get_jpeg_bytes(),
                     )
                 conn.close()
             except Exception as e:
@@ -398,16 +417,14 @@ async def upload_camera_frame(camera_id: str, file: UploadFile = File(...)):
         else:
             # Unidentified visitor: Capture snapshot into unknown_persons repository
             unk_key = f"unk_{camera_id}"
-            if frame_jpeg_bytes and (
-                now_ts - stream_alert_cooldown.get(unk_key, 0) > 20
-            ):
+            if now_ts - stream_alert_cooldown.get(unk_key, 0) > 20:
                 stream_alert_cooldown[unk_key] = now_ts
                 try:
                     record_unknown_person_capture(
                         env_id=environment_id,
                         camera_name=cam_name,
                         location=cam_loc,
-                        face_roi_bytes=frame_jpeg_bytes,
+                        face_roi_bytes=get_jpeg_bytes(),
                         gender=analysis.get("detected_gender", "person"),
                     )
                 except Exception as ex:
@@ -461,7 +478,7 @@ async def upload_camera_frame(camera_id: str, file: UploadFile = File(...)):
                             description=violation_detail,
                             camera_name=cam_name,
                             location=cam_loc,
-                            proof_bytes=frame_jpeg_bytes,
+                            proof_bytes=get_jpeg_bytes(),
                         )
                 except Exception as e:
                     print(f"[CameraStream] Dress alert error: {e}")
@@ -494,7 +511,7 @@ async def upload_camera_frame(camera_id: str, file: UploadFile = File(...)):
                             description=ppe_label,
                             camera_name=cam_name,
                             location=cam_loc,
-                            proof_bytes=frame_jpeg_bytes,
+                            proof_bytes=get_jpeg_bytes(),
                         )
                 except Exception as e:
                     print(f"[CameraStream] Safety alert error: {e}")
@@ -527,7 +544,7 @@ async def upload_camera_frame(camera_id: str, file: UploadFile = File(...)):
                         description=f"Prohibited {item} usage",
                         camera_name=cam_name,
                         location=cam_loc,
-                        proof_bytes=frame_jpeg_bytes,
+                        proof_bytes=get_jpeg_bytes(),
                     )
             except Exception as e:
                 print(f"[CameraStream] Security alert error: {e}")

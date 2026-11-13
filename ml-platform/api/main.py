@@ -84,3 +84,21 @@ def status():
         "version": "1.0.0",
         "service": "Sentronix AI Operations Platform",
     }
+
+
+@app.get("/api/ai/warmup")
+def ai_warmup_endpoint():
+    """Explicit warmup endpoint so frontend can pre-warm vision perception models immediately on view load."""
+    from api.face_recognition_service import warmup_ai_models, get_yolo_model
+
+    warmup_ai_models()
+    return {"status": "ready", "yolo_ready": get_yolo_model() is not None}
+
+
+@app.on_event("startup")
+def startup_event():
+    import threading
+    from api.face_recognition_service import warmup_ai_models
+
+    # Warmup YOLO and face biometrics in background thread on server startup
+    threading.Thread(target=warmup_ai_models, daemon=True).start()

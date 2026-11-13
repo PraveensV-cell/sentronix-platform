@@ -1999,3 +1999,539 @@ input:focus, select:focus, textarea:focus {
     font-size: 11px;
     font-weight: 600;
 }
+
+/* ==========================================================================
+   UNIFIED MASTER SURVEILLANCE CONSOLE (CLEAN TOOLBAR & TOOLS ADJUSTMENT)
+   ========================================================================== */
+
+.vms-master-console {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+}
+
+/* ── Row 1: Primary Toolbar (Camera Fleet, Signal, Live Optics & Actions) ── */
+.vms-toolbar-primary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 8px 14px;
+    border-radius: 8px;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    box-shadow: var(--card-shadow);
+    flex-wrap: wrap;
+    min-height: 44px;
+    box-sizing: border-box;
+}
+
+.vms-tool-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.vms-tool-label {
+    font-size: 10px;
+    font-weight: 800;
+    color: var(--text-muted);
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+/* Camera Selector Dropdown */
+.vms-camera-select {
+    height: 32px;
+    padding: 0 10px;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    font-size: 12px;
+    font-weight: 700;
+    outline: none;
+    cursor: pointer;
+    max-width: 260px;
+    transition: border-color 0.15s ease;
+}
+
+.vms-camera-select:focus {
+    border-color: var(--royal-gold);
+}
+
+/* Action Buttons */
+.vms-btn-action {
+    height: 32px;
+    padding: 0 12px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 800;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    white-space: nowrap;
+    border: none;
+    transition: all 0.15s ease;
+}
+
+.vms-btn-action.btn-add-cam {
+    background: var(--royal-gold);
+    color: #0c1017;
+    box-shadow: 1px 1px 0px rgba(0, 0, 0, 0.2);
+}
+
+.vms-btn-action.btn-add-cam:hover {
+    filter: brightness(1.1);
+}
+
+.vms-btn-action.btn-stream-pause {
+    background: #dc2626;
+    color: #ffffff;
+}
+
+.vms-btn-action.btn-stream-resume {
+    background: #10b981;
+    color: #0c1017;
+}
+
+.vms-btn-action.btn-snapshot {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+}
+
+.vms-btn-action.btn-snapshot:hover {
+    border-color: var(--royal-gold);
+}
+
+/* Segmented Signal Inputs */
+.vms-segmented-buttons {
+    display: flex;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 2px;
+    gap: 2px;
+}
+
+.vms-segment-btn {
+    height: 26px;
+    padding: 0 10px;
+    border-radius: 4px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    transition: all 0.15s ease;
+}
+
+.vms-segment-btn:hover {
+    color: var(--text-primary);
+}
+
+.vms-segment-btn.active {
+    background: var(--card-bg);
+    color: var(--text-primary);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+    font-weight: 800;
+}
+
+[data-theme="dark"] .vms-segment-btn.active {
+    background: var(--royal-gold);
+    color: #0c1017;
+}
+
+.vms-device-select {
+    height: 30px;
+    padding: 0 8px;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    font-size: 11px;
+    font-weight: 700;
+    outline: none;
+}
+
+/* Live Badge */
+.vms-live-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    height: 24px;
+    border-radius: 12px;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    background: rgba(16, 185, 129, 0.12);
+    border: 1px solid rgba(16, 185, 129, 0.4);
+    color: #10b981;
+}
+
+.vms-pulse-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #10b981;
+    box-shadow: 0 0 6px rgba(16, 185, 129, 0.8);
+    animation: pulse-dot 1.5s infinite;
+}
+
+/* Optics Mode Segmented Toggle */
+.vms-optics-toggle {
+    display: flex;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 2px;
+    gap: 2px;
+}
+
+.vms-optics-btn {
+    height: 24px;
+    padding: 0 8px;
+    border-radius: 4px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 10px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.vms-optics-btn.active {
+    background: #10b981;
+    color: #0c1017;
+}
+
+/* ── Row 2: Docked AI Perception Function Ribbon ─────────────────────────── */
+.vms-function-ribbon {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 6px 14px;
+    border-radius: 8px 8px 0 0;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-bottom: none;
+    box-sizing: border-box;
+    flex-wrap: wrap;
+}
+
+.vms-ribbon-label {
+    font-size: 10px;
+    font-weight: 800;
+    color: var(--text-muted);
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.vms-ribbon-pills {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.vms-fn-pill {
+    height: 28px;
+    padding: 0 12px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    border: 1px solid var(--border-color);
+    background: var(--card-bg);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+}
+
+.vms-fn-pill:hover {
+    border-color: var(--royal-gold);
+    color: var(--text-primary);
+}
+
+.vms-fn-pill.active {
+    background: var(--royal-gold);
+    color: #0c1017;
+    font-weight: 800;
+    border-color: transparent;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+}
+
+.vms-active-indicator {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--royal-gold);
+    margin-left: auto;
+    white-space: nowrap;
+}
+
+/* ── Viewport Frame (Docked Seamlessly with Function Ribbon) ─────────────── */
+.vms-viewport-container {
+    background-color: #000000;
+    border-radius: 0;
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+    box-shadow: var(--card-shadow);
+    position: relative;
+    width: 100%;
+}
+
+/* ── Row 3: Consolidated Telemetry HUD (Docked under Video) ──────────────── */
+.vms-telemetry-hud {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 14px;
+    border-radius: 0 0 8px 8px;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-top: none;
+    box-shadow: var(--card-shadow);
+    flex-wrap: wrap;
+    box-sizing: border-box;
+}
+
+.vms-hud-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.vms-hud-title {
+    font-size: 11px;
+    font-weight: 800;
+    color: var(--text-primary);
+    white-space: nowrap;
+}
+
+.vms-detection-tags {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.vms-det-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    border: 1px solid;
+    background: var(--bg-secondary);
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.vms-det-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.vms-hud-standby {
+    font-size: 11px;
+    font-style: italic;
+    color: var(--text-muted);
+}
+
+.vms-hud-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-left: auto;
+    flex-wrap: wrap;
+}
+
+.vms-diag-item {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-muted);
+}
+
+.vms-diag-item.text-green {
+    color: #10b981 !important;
+}
+
+/* ── Reference Image 2: VMS Header Bar & Layout ─────────────────────────── */
+.vms-header-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.vms-header-title-box .vms-page-title {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 800;
+    color: var(--text-primary);
+    letter-spacing: 0.5px;
+}
+
+.vms-header-title-box .vms-camera-subtitle {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 2px;
+}
+
+.vms-header-title-box .vms-camera-subtitle strong {
+    color: var(--royal-gold);
+    font-weight: 700;
+}
+
+.vms-header-status-box {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.vms-stream-toggle-btn {
+    height: 32px;
+    padding: 0 16px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.vms-stream-toggle-btn.is-stopping {
+    background: #dc2626;
+    color: #ffffff;
+    border: 1px solid #b91c1c;
+    box-shadow: 1px 1px 0px rgba(0, 0, 0, 0.2);
+}
+
+.vms-stream-toggle-btn.is-stopping:hover {
+    background: #b91c1c;
+}
+
+.vms-stream-toggle-btn.is-starting {
+    background: #10b981;
+    color: #0c1017;
+    border: 1px solid #059669;
+    box-shadow: 1px 1px 0px rgba(0, 0, 0, 0.2);
+}
+
+.vms-stream-toggle-btn.is-starting:hover {
+    background: #059669;
+}
+
+.vms-live-indicator-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+}
+
+.vms-live-indicator-pill.online {
+    background: rgba(16, 185, 129, 0.14);
+    border: 1px solid #10b981;
+    color: #10b981;
+}
+
+.vms-live-indicator-pill.offline {
+    background: rgba(245, 158, 11, 0.14);
+    border: 1px solid #f59e0b;
+    color: #f59e0b;
+}
+
+/* ── Reference Image 2: Under-Video Telemetry HUD ───────────────────────── */
+.vms-hud-header-line {
+    font-size: 12px;
+    font-weight: 800;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+}
+
+.vms-detected-items-column {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    margin-bottom: 10px;
+}
+
+.vms-detected-line {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.vms-detected-line .vms-item-name {
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.vms-detected-line .vms-item-conf {
+    color: var(--text-muted);
+    font-size: 11px;
+}
+
+.vms-hud-disclaimer {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+    line-height: 1.4;
+}
+
+.vms-hud-footer-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-top: 1px solid var(--border-color);
+    padding-top: 8px;
+    font-size: 11px;
+    color: var(--text-muted);
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.vms-footer-left .vms-label-dim {
+    color: var(--text-muted);
+}
+
+.vms-footer-left strong {
+    color: var(--text-primary);
+}
+
+.vms-footer-right {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.vms-hud-sep {
+    color: var(--text-muted);
+    opacity: 0.5;
+}
