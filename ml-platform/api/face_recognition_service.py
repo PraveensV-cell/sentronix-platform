@@ -628,9 +628,10 @@ def analyze_surveillance_frame(
     # Extract 128-d spatial embedding using the located face box (Zero redundant YOLO run!)
     feat, _ = extract_face_embedding(frame, known_face_box=target_face_box)
     has_person = len(yolo_persons) > 0 or target_face_box is not None
+    has_objects = len(yolo_objects) > 0 or len(yolo_phones) > 0
 
-    if not has_person:
-        # Standby mode: No subject in frame, zero fake alerts!
+    if not has_person and not has_objects:
+        # Standby mode: No subject or object in frame, zero fake alerts!
         return {
             "person_detected": False,
             "face_detected": False,
@@ -639,7 +640,7 @@ def analyze_surveillance_frame(
             "is_match": False,
             "matched_person": None,
             "similarity": 0.0,
-            "detected_gender": "person",
+            "detected_gender": "none",
             "dress_code": {
                 "id_card_detected": None,
                 "id_card_status": "STANDBY • WAITING FOR SUBJECT",
@@ -653,6 +654,60 @@ def analyze_surveillance_frame(
                 "status_label": "STANDBY • WAITING FOR WORKER",
             },
             "prohibited_items": [],
+            "assigned_function": assigned_function,
+            "timestamp": time.time(),
+        }
+
+    # If only objects/devices are in frame (e.g., unattended bags, prohibited phones on desk, vehicles)
+    if not has_person and has_objects:
+        obj_detections: List[Dict[str, Any]] = []
+        proh_items: List[str] = []
+        for ph_x, ph_y, ph_w, ph_h, ph_c in yolo_phones:
+            proh_items.append("Smartphone")
+            obj_detections.append(
+                {
+                    "type": "prohibited",
+                    "label": f"🚨 PROHIBITED SMARTPHONE {int(ph_c * 100)}%",
+                    "conf": ph_c,
+                    "box": [ph_x, ph_y, ph_w, ph_h],
+                    "color": "#ef4444",
+                }
+            )
+        for obj in yolo_objects:
+            obj_detections.append(
+                {
+                    "type": "object",
+                    "label": f"{obj['name']} {obj['conf']:.2f}",
+                    "conf": obj["conf"],
+                    "box": obj["box"],
+                    "color": "#06b6d4",
+                }
+            )
+        return {
+            "person_detected": False,
+            "face_detected": False,
+            "detections": obj_detections,
+            "objects_summary": [
+                {"label": d["label"], "conf": d["conf"], "color": d["color"]}
+                for d in obj_detections
+            ],
+            "is_match": False,
+            "matched_person": None,
+            "similarity": 0.0,
+            "detected_gender": "object",
+            "dress_code": {
+                "id_card_detected": None,
+                "id_card_status": "MONITORING OBJECTS",
+                "dress_compliant": True,
+                "dress_type": "None",
+                "compliance_status": "OBJECT_ACTIVE",
+            },
+            "safety_ppe": {
+                "ppe_active": False,
+                "ppe_compliant": True,
+                "status_label": "STANDBY • WAITING FOR WORKER",
+            },
+            "prohibited_items": proh_items,
             "assigned_function": assigned_function,
             "timestamp": time.time(),
         }
@@ -884,7 +939,7 @@ def analyze_surveillance_frame(
         )
 
     # 8. Additional Detected Objects (motorcycles, backpacks, etc. - Reference Image 1)
-    for obj in yolo_objects[:6]:
+    for obj in yolo_objects:
         detections.append(
             {
                 "type": "object",

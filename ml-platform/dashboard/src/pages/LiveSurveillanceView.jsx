@@ -522,18 +522,19 @@ export default function LiveSurveillanceView({ environment, systemOnline }) {
                             const textMetrics = ctx.measureText(det.label || "detected");
                             const badgeW = textMetrics.width + 12;
                             const badgeH = 18;
+                            const badgeX = Math.max(0, Math.min(cw - badgeW, bx));
                             const badgeY = by >= badgeH ? by - badgeH : by;
 
                             // Solid badge background fill matching box color exactly (Image 1 & 2)
                             ctx.fillStyle = color;
-                            ctx.fillRect(bx, badgeY, badgeW, badgeH);
+                            ctx.fillRect(badgeX, badgeY, badgeW, badgeH);
 
                             // Crisp high-contrast text: black on bright fills, white on dark/red fills
                             const cLower = (color || "").toLowerCase();
                             const isBright = ["#10b981", "#00e676", "#ffd700", "#d4af37", "#38bdf8", "#06b6d4", "#a3e635", "#fed7aa"].some(c => cLower.includes(c));
                             ctx.fillStyle = isBright ? "#000000" : "#ffffff";
                             ctx.textBaseline = "middle";
-                            ctx.fillText(det.label || "detected", bx + 6, badgeY + badgeH / 2);
+                            ctx.fillText(det.label || "detected", badgeX + 6, badgeY + badgeH / 2);
                         });
                     } else {
                         // ─── Standby Mode: Waiting silently for subject (Zero fake alerts) ───
